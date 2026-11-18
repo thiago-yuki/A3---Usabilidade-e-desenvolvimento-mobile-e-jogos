@@ -7,7 +7,7 @@ class Hud:
         self.fonte = pygame.font.Font(None, 24)
 
     def desenhar(self, tela, jogador):
-        for i in range(config.VIDA_JOGADOR):
+        for i in range(jogador.vida_max):
             cor = config.VERMELHO if i < jogador.vida else (60, 40, 40)
             pygame.draw.rect(tela, cor, (16 + i * 34, 40, 26, 26), border_radius=6)
 
@@ -17,5 +17,9 @@ class Hud:
             y += 22
         if jogador.tem_avanco:
             pronto = jogador.recarga_avanco <= 0
+            if jogador.modo_guerreira:
+                rotulo = "Esquiva Sombria (SHIFT)" if pronto else "Esquiva Sombria..."
+            else:
+                rotulo = "Avanço (K / SHIFT)"
             cor = config.DOURADO if pronto else config.CINZA
-            tela.blit(self.fonte.render("Avanço (K / SHIFT)", True, cor), (16, y))
+            tela.blit(self.fonte.render(rotulo, True, cor), (16, y))

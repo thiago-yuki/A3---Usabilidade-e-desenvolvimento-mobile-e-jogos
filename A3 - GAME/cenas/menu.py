@@ -22,6 +22,8 @@ class Menu(Cena):
                     self._iniciar(1)
                 elif e.key == pygame.K_2:
                     self._iniciar(2)          # atalho para testar a fase 2
+                elif e.key == pygame.K_3:
+                    self._iniciar(3)          # atalho para testar a fase 3
                 elif e.key == pygame.K_ESCAPE:
                     self.jogo.sair()
 
@@ -30,7 +32,7 @@ class Menu(Cena):
         self._centralizar(tela, "A Última Chama de Esparta", self.fonte_titulo, config.DOURADO, 180)
         self._centralizar(tela, "ENTER - Jogar", self.fonte_texto, config.BRANCO, 320)
         self._centralizar(tela, "ESC - Sair", self.fonte_texto, config.CINZA, 370)
-        self._centralizar(tela, "[2] atalho de teste: ir direto para a Fase 2", self.fonte_pequena, (90, 90, 100), 480)
+        self._centralizar(tela, "[2] Fase 2  |  [3] Fase 3 (atalhos de teste)", self.fonte_pequena, (90, 90, 100), 480)
 
     def _centralizar(self, tela, texto, fonte, cor, y):
         img = fonte.render(texto, True, cor)

@@ -1,38 +1,97 @@
+import math
+import random
 import pygame
 import config
 
 
+class Tiro12:
+    """Chumbinho disparado pela calibre 12 da guerreira na Fase 3."""
+
+    def __init__(self, x, y, direcao, angulo_graus):
+        self.pos = pygame.Vector2(x, y)
+        self.pos_anterior = pygame.Vector2(x, y)
+        rad = math.radians(angulo_graus)
+        velocidade = 860
+        self.vel = pygame.Vector2(
+            math.cos(rad) * velocidade * direcao,
+            math.sin(rad) * velocidade,
+        )
+        self.rect = pygame.Rect(round(x) - 3, round(y) - 3, 6, 6)
+        self.distancia = 0.0
+        self.alcance_max = 265
+        self.ativo = True
+        self.atingiu_parede = False
+
+    def atualizar(self, dt, solidos):
+        self.pos_anterior.update(self.pos)
+        passo = self.vel * dt
+        self.pos += passo
+        self.distancia += passo.length()
+        self.rect.center = (round(self.pos.x), round(self.pos.y))
+
+        if self.distancia >= self.alcance_max:
+            self.ativo = False
+            return
+
+        for s in solidos:
+            if self.rect.colliderect(s.rect):
+                self.ativo = False
+                self.atingiu_parede = True
+                return
+
+    def desenhar(self, tela, camera):
+        r = camera.aplicar(self.rect)
+        if r.right < -20 or r.left > config.LARGURA + 20:
+            return
+        ini = (round(self.pos_anterior.x - camera.x), round(self.pos_anterior.y - camera.y))
+        fim = r.center
+        pygame.draw.line(tela, (255, 165, 45), ini, fim, 2)
+        pygame.draw.circle(tela, (255, 235, 120), fim, 4)
+        pygame.draw.circle(tela, config.BRANCO, fim, 2)
+
+
 class Jogador:
-    """Dáron. Por enquanto é um retângulo; os sprites entram depois."""
+    """Dáron nas fases 1 e 2; Guerreira com calibre 12, escalada e 3 vidas na Fase 3."""
 
     LARGURA = 40
     ALTURA = 56
+    RECARGA_12 = 0.52
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, modo_guerreira=False):
+        self.modo_guerreira = modo_guerreira
         self.inicio = (x, y)
         self.rect = pygame.Rect(x, y, self.LARGURA, self.ALTURA)
-        self.pos = pygame.Vector2(x, y)   # posição com decimais (movimento suave)
+        self.pos = pygame.Vector2(x, y)
         self.vel = pygame.Vector2(0, 0)
         self.no_chao = False
-        self.direcao = 1                  # 1 = direita, -1 = esquerda
+        self.direcao = 1
+        self.anim_t = 0.0
 
-        # Pulo (a relíquia do salto duplo muda pulos_maximos para 2)
+        # Escalada em cipós/raízes e em paredes
+        self.escalando = False
+        self.na_parede = 0          # -1 encostada à esquerda, +1 à direita, 0 livre
+        self.parede_coyote = 0.0
+        self.ultima_parede_dir = 0
+        self.recuo_parede = 0.0
+
         self.pulos_maximos = 1
         self.pulos_restantes = 1
+        self.coyote_tempo = 0.0
+        self.buffer_pulo = 0.0
 
-        # Habilidades conquistadas
         self.tem_salto_duplo = False
         self.tem_avanco = False
         self.tempo_avanco = 0.0
         self.recarga_avanco = 0.0
 
-        # Combate
-        self.vida = config.VIDA_JOGADOR
-        self.tempo_ataque = 0.0           # > 0 enquanto o golpe está ativo
+        self.vida_max = 3 if modo_guerreira else config.VIDA_JOGADOR
+        self.vida = self.vida_max
+        self.tempo_ataque = 0.0
         self.tempo_recarga = 0.0
-        self.alvos_acertados = set()      # garante 1 acerto por inimigo em cada golpe
+        self.alvos_acertados = set()
         self.invencivel = 0.0
-        self.recuo = 0.0                  # > 0 enquanto está sendo empurrado
+        self.recuo = 0.0
+        self.coice_tiro = 0.0
 
     # ---------- ações ----------
     def reiniciar(self):
@@ -42,6 +101,13 @@ class Jogador:
         self.tempo_ataque = 0.0
         self.tempo_avanco = 0.0
         self.recuo = 0.0
+        self.coice_tiro = 0.0
+        self.coyote_tempo = 0.0
+        self.buffer_pulo = 0.0
+        self.escalando = False
+        self.na_parede = 0
+        self.parede_coyote = 0.0
+        self.recuo_parede = 0.0
         self.invencivel = config.TEMPO_INVENCIVEL
 
     def desbloquear(self, habilidade):
@@ -53,26 +119,73 @@ class Jogador:
             self.tem_avanco = True
 
     def pular(self):
-        if self.pulos_restantes > 0:
+        self.buffer_pulo = 0.10
+        self._tentar_executar_pulo()
+
+    def _tentar_executar_pulo(self):
+        if self.buffer_pulo <= 0:
+            return
+        if self.escalando:
+            self.escalando = False
+            self.vel.y = -config.FORCA_PULO * 0.95
+            self.buffer_pulo = 0.0
+            self.pulos_restantes = max(0, self.pulos_maximos - 1)
+        elif self.no_chao or self.coyote_tempo > 0:
+            self.vel.y = -config.FORCA_PULO
+            self.no_chao = False
+            self.coyote_tempo = 0.0
+            self.buffer_pulo = 0.0
+            self.pulos_restantes = max(0, self.pulos_maximos - 1)
+        elif self.modo_guerreira and (self.na_parede != 0 or self.parede_coyote > 0):
+            # Salto de escalada na parede (wall-jump)
+            lado = self.na_parede if self.na_parede != 0 else self.ultima_parede_dir
+            self.vel.y = -config.FORCA_PULO * 0.94
+            self.vel.x = -lado * config.VELOCIDADE_JOGADOR * 1.15
+            self.direcao = -lado
+            self.recuo_parede = 0.14
+            self.parede_coyote = 0.0
+            self.buffer_pulo = 0.0
+            self.pulos_restantes = max(0, self.pulos_maximos - 1)
+        elif self.pulos_restantes > 0:
             self.vel.y = -config.FORCA_PULO
             self.pulos_restantes -= 1
+            self.buffer_pulo = 0.0
 
     def avancar(self):
         if self.tem_avanco and self.recarga_avanco <= 0 and self.recuo <= 0:
+            self.escalando = False
             self.tempo_avanco = config.AVANCO_DURACAO
             self.recarga_avanco = config.AVANCO_RECARGA
-            self.invencivel = max(self.invencivel, config.AVANCO_DURACAO)  # não leva dano no avanço
+            self.invencivel = max(self.invencivel, config.AVANCO_DURACAO)
 
     def atacar(self):
-        if self.tempo_recarga <= 0:
-            self.tempo_ataque = config.ATAQUE_DURACAO
-            self.tempo_recarga = config.ATAQUE_RECARGA
-            self.alvos_acertados.clear()
+        """Golpe corpo a corpo nas fases 1-2; disparo de calibre 12 na Fase 3."""
+        if self.tempo_recarga > 0:
+            return []
+
+        if self.modo_guerreira:
+            self.escalando = False
+            self.tempo_ataque = 0.16
+            self.tempo_recarga = self.RECARGA_12
+            self.coice_tiro = -self.direcao * 115.0
+            boca_x = self.rect.centerx + 28 * self.direcao
+            boca_y = self.rect.centery + 3
+            angulos = [-10, -4, 0, 4, 10]
+            return [
+                Tiro12(boca_x, boca_y, self.direcao, ang + random.uniform(-1.4, 1.4))
+                for ang in angulos
+            ]
+
+        self.tempo_ataque = config.ATAQUE_DURACAO
+        self.tempo_recarga = config.ATAQUE_RECARGA
+        self.alvos_acertados.clear()
+        return []
 
     def receber_dano(self, dano, origem_x):
         """Devolve True se levou o dano (False se estava invencível)."""
         if self.invencivel > 0:
             return False
+        self.escalando = False
         self.vida -= dano
         self.invencivel = config.TEMPO_INVENCIVEL
         sentido = 1 if self.rect.centerx >= origem_x else -1
@@ -91,8 +204,8 @@ class Jogador:
 
     @property
     def hitbox_ataque(self):
-        """Área do golpe (None se não está atacando)."""
-        if not self.atacando:
+        """Área do golpe corpo a corpo (None na Fase 3 ou se não está atacando)."""
+        if self.modo_guerreira or not self.atacando:
             return None
         alcance, altura = config.ATAQUE_ALCANCE, 40
         if self.direcao == 1:
@@ -103,74 +216,136 @@ class Jogador:
         return area
 
     # ---------- atualização ----------
-    def atualizar(self, dt, plataformas, largura_mundo):
+    def atualizar(self, dt, plataformas, largura_mundo, cipos=()):
         self.tempo_ataque = max(0.0, self.tempo_ataque - dt)
         self.tempo_recarga = max(0.0, self.tempo_recarga - dt)
         self.tempo_avanco = max(0.0, self.tempo_avanco - dt)
         self.recarga_avanco = max(0.0, self.recarga_avanco - dt)
         self.invencivel = max(0.0, self.invencivel - dt)
+        self.coyote_tempo = max(0.0, self.coyote_tempo - dt)
+        self.buffer_pulo = max(0.0, self.buffer_pulo - dt)
+        self.parede_coyote = max(0.0, self.parede_coyote - dt)
+        self.recuo_parede = max(0.0, self.recuo_parede - dt)
 
-        # --- movimento horizontal ---
-        if self.avancando:
-            self.vel.x = self.direcao * config.AVANCO_VELOCIDADE
-            self.vel.y = 0                    # o avanço ignora a gravidade
-        elif self.recuo > 0:
-            self.recuo -= dt                  # sendo empurrado: ignora o teclado
+        if abs(self.coice_tiro) > 1.0:
+            self.coice_tiro *= max(0.0, 1.0 - 14.0 * dt)
         else:
-            teclas = pygame.key.get_pressed()
-            direcao = 0
-            if teclas[pygame.K_LEFT] or teclas[pygame.K_a]:
-                direcao -= 1
-            if teclas[pygame.K_RIGHT] or teclas[pygame.K_d]:
-                direcao += 1
-            self.vel.x = direcao * config.VELOCIDADE_JOGADOR
+            self.coice_tiro = 0.0
+
+        teclas = pygame.key.get_pressed()
+        direcao = 0
+        if teclas[pygame.K_LEFT] or teclas[pygame.K_a]:
+            direcao -= 1
+        if teclas[pygame.K_RIGHT] or teclas[pygame.K_d]:
+            direcao += 1
+
+        subindo = teclas[pygame.K_w] or teclas[pygame.K_UP]
+        descendo = teclas[pygame.K_s] or teclas[pygame.K_DOWN]
+
+        # Verifica contato com cipós/raízes de escalada
+        cipo_tocado = None
+        for c in cipos:
+            if self.rect.colliderect(c.rect):
+                cipo_tocado = c
+                break
+
+        if cipo_tocado is not None and not self.avancando and self.recuo <= 0:
+            if subindo or (descendo and not self.no_chao):
+                self.escalando = True
+        else:
+            self.escalando = False
+
+        if self.escalando:
+            self.pulos_restantes = self.pulos_maximos
+            self.vel.x = direcao * (config.VELOCIDADE_JOGADOR * 0.55)
+            if direcao != 0:
+                self.direcao = direcao
+            if subindo:
+                self.vel.y = -195.0
+            elif descendo:
+                self.vel.y = 215.0
+            else:
+                self.vel.y = 0.0
+
+            if abs(self.vel.y) > 10 or abs(self.vel.x) > 10:
+                self.anim_t += dt
+        elif self.avancando:
+            self.vel.x = self.direcao * config.AVANCO_VELOCIDADE
+            self.vel.y = 0
+        elif self.recuo > 0:
+            self.recuo -= dt
+        elif self.recuo_parede > 0:
+            pass
+        else:
+            self.vel.x = direcao * config.VELOCIDADE_JOGADOR + self.coice_tiro
             if direcao != 0:
                 self.direcao = direcao
 
-        # --- gravidade ---
-        if not self.avancando:
-            self.vel.y = min(self.vel.y + config.GRAVIDADE * dt, config.VELOCIDADE_QUEDA_MAX)
+        if not self.escalando:
+            if abs(self.vel.x) > 10 and self.no_chao:
+                self.anim_t += dt
+            else:
+                self.anim_t = 0.0
 
-        # --- move no eixo X e resolve colisões ---
+        if not self.avancando and not self.escalando:
+            limite_queda = 140.0 if (self.modo_guerreira and self.na_parede != 0 and self.vel.y > 0) else config.VELOCIDADE_QUEDA_MAX
+            self.vel.y = min(self.vel.y + config.GRAVIDADE * dt, limite_queda)
+
         self.pos.x += self.vel.x * dt
         self.rect.x = round(self.pos.x)
+        self.na_parede = 0
         for p in plataformas:
             if self.rect.colliderect(p.rect):
                 if self.vel.x > 0:
                     self.rect.right = p.rect.left
+                    self.na_parede = 1
                 elif self.vel.x < 0:
                     self.rect.left = p.rect.right
+                    self.na_parede = -1
                 self.pos.x = self.rect.x
 
-        # --- move no eixo Y e resolve colisões ---
+        # Sonda lateral para detectar parede mesmo quando apenas encostada no ar
+        if self.na_parede == 0 and not self.no_chao and direcao != 0:
+            sonda_lat = self.rect.move(direcao * 2, 0)
+            if any(sonda_lat.colliderect(p.rect) for p in plataformas):
+                self.na_parede = direcao
+
+        if self.na_parede != 0 and not self.no_chao:
+            self.parede_coyote = 0.12
+            self.ultima_parede_dir = self.na_parede
+
         estava_no_chao = self.no_chao
         self.pos.y += self.vel.y * dt
         self.rect.y = round(self.pos.y)
         self.no_chao = False
         for p in plataformas:
             if self.rect.colliderect(p.rect):
-                if self.vel.y > 0:            # caindo: pousou em cima
+                if self.vel.y > 0:
                     self.rect.bottom = p.rect.top
                     self.no_chao = True
-                elif self.vel.y < 0:          # subindo: bateu a cabeça
+                elif self.vel.y < 0:
                     self.rect.top = p.rect.bottom
                 self.vel.y = 0
                 self.pos.y = self.rect.y
 
-        # parado em cima de algo, a gravidade move menos de 1px e o retângulo nem sempre
-        # encosta; então "sonda" 1px abaixo dos pés para saber se ainda há chão
-        if not self.no_chao and self.vel.y >= 0:
+        if not self.no_chao and self.vel.y >= 0 and not self.escalando:
             sonda = self.rect.move(0, 1)
             if any(sonda.colliderect(p.rect) for p in plataformas):
                 self.no_chao = True
 
         if self.no_chao:
+            self.escalando = False
+            self.na_parede = 0
             self.pulos_restantes = self.pulos_maximos
-        elif estava_no_chao and self.vel.y >= 0:
-            # saiu de uma beirada sem pular: sobra no máximo 1 pulo no ar
+            self.coyote_tempo = 0.09
+            if self.buffer_pulo > 0:
+                self._tentar_executar_pulo()
+        elif estava_no_chao and self.vel.y >= 0 and not self.escalando:
             self.pulos_restantes = min(self.pulos_restantes, max(1, self.pulos_maximos - 1))
 
-        # --- não deixa sair pelos lados do mapa ---
+        if self.buffer_pulo > 0 and (self.escalando or self.na_parede != 0 or self.parede_coyote > 0):
+            self._tentar_executar_pulo()
+
         if self.rect.left < 0:
             self.rect.left = 0
             self.pos.x = self.rect.x
@@ -180,13 +355,16 @@ class Jogador:
 
     # ---------- desenho ----------
     def desenhar(self, tela, camera):
-        # pisca enquanto está invencível (menos durante o avanço)
         if self.invencivel > 0 and not self.avancando and int(self.invencivel * 20) % 2 == 0:
             return
 
         rect = camera.aplicar(self.rect)
 
-        if self.avancando:  # rastro do avanço
+        if self.modo_guerreira:
+            self._desenhar_guerreira(tela, rect)
+            return
+
+        if self.avancando:
             rastro = pygame.Surface(rect.size, pygame.SRCALPHA)
             rastro.fill((*config.VERMELHO, 90))
             tela.blit(rastro, (rect.x - self.direcao * 26, rect.y))
@@ -201,3 +379,224 @@ class Jogador:
             golpe = pygame.Surface(area.size, pygame.SRCALPHA)
             golpe.fill((*config.DOURADO, 170))
             tela.blit(golpe, area.topleft)
+
+    def _desenhar_guerreira(self, tela, rect):
+        """Desenha uma Mulher Guerreira espartana com silhueta feminina, cabelo longo, corselete e calibre 12."""
+        d = self.direcao
+        cx = rect.centerx
+        correndo = abs(self.vel.x) > 10
+        escalando_ativo = self.escalando or (self.na_parede != 0 and not self.no_chao)
+        passo = int(math.sin(self.anim_t * 15) * 4) if (self.no_chao or self.escalando) else 3
+        balanco = int(math.sin(pygame.time.get_ticks() * 0.009) * 3) + (5 if correndo else 0)
+        impulso_ar = -3 if not self.no_chao and self.vel.y < 0 else (3 if not self.no_chao else 0)
+
+        cor_pele = (238, 194, 165)
+        cor_pele_sombra = (206, 158, 130)
+        cor_cabelo = (36, 18, 26)
+        cor_cabelo_brilho = (74, 38, 52)
+        cor_aco = (72, 78, 96)
+        cor_aco_escuro = (42, 46, 58)
+        cor_carmesim = (146, 26, 52)
+        cor_carmesim_escuro = (96, 16, 36)
+
+        if self.avancando:
+            rastro = pygame.Surface(rect.size, pygame.SRCALPHA)
+            rastro.fill((185, 42, 78, 95))
+            tela.blit(rastro, (rect.x - d * 26, rect.y))
+
+        # 1. Capa espartana carmesim presa no ombro de trás
+        ombro_tras_x = cx - d * 6
+        ponta_capa_x = cx - d * (19 + balanco)
+        pygame.draw.polygon(tela, cor_carmesim_escuro, [
+            (ombro_tras_x, rect.y + 18),
+            (ponta_capa_x, rect.bottom - 6 + impulso_ar),
+            (cx - d * 7, rect.bottom - 5),
+        ])
+        pygame.draw.polygon(tela, cor_carmesim, [
+            (ombro_tras_x, rect.y + 18),
+            (ponta_capa_x + d * 4, rect.bottom - 11 + impulso_ar),
+            (cx - d * 3, rect.y + 37),
+        ])
+
+        # 2. Cabelo longo e rabo de cavalo alto esvoaçante
+        nuca_x = cx - d * 6
+        nuca_y = rect.y + 7
+        ponta_cabelo_x = cx - d * (18 + balanco)
+        ponta_cabelo_y = rect.y + 27 + impulso_ar
+        pygame.draw.polygon(tela, cor_cabelo, [
+            (nuca_x, nuca_y - 2),
+            (cx - d * (15 + balanco // 2), rect.y + 13),
+            (ponta_cabelo_x, ponta_cabelo_y),
+            (cx - d * (9 + balanco // 3), rect.y + 25),
+            (nuca_x + d * 2, nuca_y + 6),
+        ])
+        pygame.draw.line(
+            tela, cor_cabelo_brilho,
+            (nuca_x - d * 2, nuca_y + 1),
+            (ponta_cabelo_x + d * 3, ponta_cabelo_y - 3),
+            2,
+        )
+        pygame.draw.circle(tela, config.DOURADO, (nuca_x - d * 1, nuca_y + 1), 3)
+
+        # 3. Pernas esguias e botas de combate de cano alto
+        perna_tras_x = cx - 7 - passo
+        perna_frente_x = cx + 1 + passo
+        for idx, px in enumerate((perna_tras_x, perna_frente_x)):
+            desloc_y = (passo if idx == 0 else -passo) if self.escalando else 0
+            pygame.draw.rect(tela, cor_pele_sombra if idx == 0 else cor_pele, (px, rect.y + 36 + desloc_y, 6, 8), border_radius=2)
+            pygame.draw.rect(tela, (34, 24, 32), (px, rect.y + 42 + desloc_y, 6, 14 - max(0, desloc_y)), border_radius=2)
+            pygame.draw.rect(tela, (20, 14, 18), (px - 1, rect.bottom - 3, 8, 3))
+            pygame.draw.rect(tela, config.DOURADO, (px - 1, rect.y + 41 + desloc_y, 8, 2))
+
+        # 4. Saiote de guerra espartano (pteruges)
+        pygame.draw.polygon(tela, cor_carmesim_escuro, [
+            (cx - 7, rect.y + 31),
+            (cx + 7, rect.y + 31),
+            (cx + 12, rect.y + 41),
+            (cx - 12, rect.y + 41),
+        ])
+        for tx in (cx - 8, cx - 3, cx + 3, cx + 8):
+            pygame.draw.line(tela, config.DOURADO, (tx, rect.y + 33), (tx + (1 if tx > cx else -1), rect.y + 40), 1)
+        pygame.draw.line(tela, config.DOURADO, (cx - 11, rect.y + 40), (cx + 11, rect.y + 40), 2)
+
+        # 5. Torso feminino esculpido com corselete acinturado
+        pygame.draw.rect(tela, cor_pele_sombra, (cx - 3, rect.y + 14, 6, 4))
+        corselete_pts = [
+            (cx - 9, rect.y + 17),
+            (cx + 9, rect.y + 17),
+            (cx + 6, rect.y + 29),
+            (cx - 6, rect.y + 29),
+        ]
+        pygame.draw.polygon(tela, cor_aco, corselete_pts)
+        pygame.draw.polygon(tela, cor_aco_escuro, corselete_pts, 1)
+
+        peito_frente_x = cx + d * 4
+        pygame.draw.ellipse(tela, (92, 100, 120), (peito_frente_x - 4, rect.y + 18, 8, 6))
+        pygame.draw.line(tela, config.DOURADO, (cx - 7, rect.y + 18), (cx, rect.y + 24), 2)
+        pygame.draw.line(tela, config.DOURADO, (cx + 7, rect.y + 18), (cx, rect.y + 24), 2)
+
+        pygame.draw.rect(tela, config.DOURADO, (cx - 6, rect.y + 28, 12, 3), border_radius=1)
+        pygame.draw.circle(tela, (255, 235, 140), (cx + d * 2, rect.y + 29), 2)
+
+        ombro_frente_x = cx - 2 if d == 1 else cx - 8
+        pygame.draw.ellipse(tela, (96, 104, 124), (ombro_frente_x, rect.y + 15, 10, 7))
+        pygame.draw.ellipse(tela, config.DOURADO, (ombro_frente_x, rect.y + 15, 10, 7), 1)
+
+        # 6. Rosto, tiara dourada e mecha lateral
+        cabeca = pygame.Rect(cx - 9, rect.y + 1, 18, 15)
+        pygame.draw.ellipse(tela, cor_pele, cabeca)
+        pygame.draw.polygon(tela, cor_pele, [
+            (cabeca.x + 3, cabeca.bottom - 5),
+            (cabeca.right - 3, cabeca.bottom - 5),
+            (cx + d * 1, cabeca.bottom + 1),
+        ])
+
+        pygame.draw.ellipse(tela, cor_cabelo, (cabeca.x - 1, cabeca.y - 1, cabeca.width + 2, 7))
+        mecha_x = cabeca.x + 1 if d == 1 else cabeca.right - 5
+        pygame.draw.polygon(tela, cor_cabelo, [
+            (mecha_x, cabeca.y + 4),
+            (mecha_x + 4, cabeca.y + 4),
+            (mecha_x + 2 - d * 2, cabeca.bottom + 3),
+        ])
+
+        pygame.draw.line(tela, config.DOURADO, (cabeca.x + 1, cabeca.y + 4), (cabeca.right - 1, cabeca.y + 4), 2)
+        testa_x = cabeca.right - 5 if d == 1 else cabeca.left + 5
+        pygame.draw.polygon(tela, config.DOURADO, [
+            (testa_x - 2, cabeca.y + 4),
+            (testa_x + 2, cabeca.y + 4),
+            (testa_x, cabeca.y + 7),
+        ])
+
+        olho_x = cabeca.right - 7 if d == 1 else cabeca.left + 3
+        pygame.draw.rect(tela, config.BRANCO, (olho_x, cabeca.y + 6, 4, 4))
+        pygame.draw.rect(tela, (28, 42, 68), (olho_x + (1 if d == 1 else 0), cabeca.y + 6, 3, 4))
+        pygame.draw.line(tela, (24, 14, 20), (olho_x - 1, cabeca.y + 6), (olho_x + 4, cabeca.y + 6), 1)
+        pygame.draw.line(tela, cor_cabelo, (olho_x - 1, cabeca.y + 4), (olho_x + 4, cabeca.y + 5), 1)
+        boca_r_x = cabeca.right - 5 if d == 1 else cabeca.left + 3
+        pygame.draw.line(tela, (196, 102, 108), (boca_r_x, cabeca.bottom - 3), (boca_r_x + 2, cabeca.bottom - 3), 2)
+
+        # 7. Se estiver escalando, calibre 12 vai nas costas e braços agarram o cipó/parede
+        if escalando_ativo:
+            lado_agarre = self.na_parede if (self.na_parede != 0 and not self.escalando) else d
+            # Calibre 12 presa nas costas em diagonal
+            pygame.draw.line(tela, (124, 66, 28), (cx - lado_agarre * 4, rect.y + 32), (cx - lado_agarre * 9, rect.y + 20), 4)
+            pygame.draw.line(tela, (46, 52, 64), (cx - lado_agarre * 9, rect.y + 20), (cx - lado_agarre * 15, rect.y + 6), 3)
+            # Braços alcançando para cima na escalada
+            mao_y1 = rect.y + 8 - passo
+            mao_y2 = rect.y + 14 + passo
+            pygame.draw.line(tela, cor_pele, (cx, rect.y + 20), (cx + lado_agarre * 11, mao_y1), 3)
+            pygame.draw.line(tela, cor_pele_sombra, (cx, rect.y + 21), (cx + lado_agarre * 10, mao_y2), 3)
+            pygame.draw.circle(tela, cor_pele, (cx + lado_agarre * 11, mao_y1), 3)
+            pygame.draw.circle(tela, cor_pele_sombra, (cx + lado_agarre * 10, mao_y2), 3)
+            return
+
+        # Espingarda Calibre 12 em combate
+        recuo_arma = -3 * d if self.atacando else 0
+        arma_y = rect.centery + 3
+        ax = cx + recuo_arma
+
+        if d == 1:
+            pygame.draw.polygon(tela, (124, 66, 28), [
+                (ax - 14, arma_y + 7),
+                (ax - 14, arma_y - 1),
+                (ax - 2, arma_y - 1),
+                (ax - 4, arma_y + 5),
+            ])
+            pygame.draw.line(tela, (40, 22, 12), (ax - 14, arma_y - 1), (ax - 14, arma_y + 7), 2)
+            pygame.draw.rect(tela, (56, 62, 74), (ax - 3, arma_y - 2, 13, 6), border_radius=2)
+            pygame.draw.rect(tela, (150, 160, 175), (ax + 1, arma_y, 5, 2))
+            pygame.draw.rect(tela, (36, 40, 48), (ax + 10, arma_y - 2, 23, 3))
+            pygame.draw.rect(tela, (62, 68, 80), (ax + 10, arma_y + 2, 20, 2))
+            pygame.draw.rect(tela, (138, 76, 32), (ax + 12, arma_y + 1, 10, 4), border_radius=1)
+            for rx in (ax + 14, ax + 17, ax + 20):
+                pygame.draw.line(tela, (75, 38, 15), (rx, arma_y + 1), (rx, arma_y + 4), 1)
+            pygame.draw.rect(tela, config.DOURADO, (ax + 31, arma_y - 4, 2, 2))
+            pygame.draw.line(tela, cor_pele, (cx + 2, rect.y + 21), (ax + 15, arma_y + 3), 3)
+            pygame.draw.circle(tela, cor_pele, (ax - 1, arma_y + 3), 3)
+            pygame.draw.circle(tela, cor_pele, (ax + 16, arma_y + 3), 3)
+            boca_x = ax + 34
+        else:
+            pygame.draw.polygon(tela, (124, 66, 28), [
+                (ax + 14, arma_y + 7),
+                (ax + 14, arma_y - 1),
+                (ax + 2, arma_y - 1),
+                (ax + 4, arma_y + 5),
+            ])
+            pygame.draw.line(tela, (40, 22, 12), (ax + 14, arma_y - 1), (ax + 14, arma_y + 7), 2)
+            pygame.draw.rect(tela, (56, 62, 74), (ax - 10, arma_y - 2, 13, 6), border_radius=2)
+            pygame.draw.rect(tela, (150, 160, 175), (ax - 6, arma_y, 5, 2))
+            pygame.draw.rect(tela, (36, 40, 48), (ax - 33, arma_y - 2, 23, 3))
+            pygame.draw.rect(tela, (62, 68, 80), (ax - 30, arma_y + 2, 20, 2))
+            pygame.draw.rect(tela, (138, 76, 32), (ax - 22, arma_y + 1, 10, 4), border_radius=1)
+            for rx in (ax - 20, ax - 17, ax - 14):
+                pygame.draw.line(tela, (75, 38, 15), (rx, arma_y + 1), (rx, arma_y + 4), 1)
+            pygame.draw.rect(tela, config.DOURADO, (ax - 33, arma_y - 4, 2, 2))
+            pygame.draw.line(tela, cor_pele, (cx - 2, rect.y + 21), (ax - 15, arma_y + 3), 3)
+            pygame.draw.circle(tela, cor_pele, (ax + 1, arma_y + 3), 3)
+            pygame.draw.circle(tela, cor_pele, (ax - 16, arma_y + 3), 3)
+            boca_x = ax - 34
+
+        # 8. Clarão do disparo
+        if self.atacando:
+            by = arma_y
+            pygame.draw.polygon(tela, (255, 110, 20), [
+                (boca_x, by),
+                (boca_x + d * 24, by - 12),
+                (boca_x + d * 20, by),
+                (boca_x + d * 24, by + 12),
+            ])
+            pygame.draw.polygon(tela, (255, 215, 70), [
+                (boca_x, by),
+                (boca_x + d * 15, by - 6),
+                (boca_x + d * 15, by + 6),
+            ])
+            pygame.draw.circle(tela, config.BRANCO, (boca_x + d * 3, by), 4)
+
+        # 9. Barra discreta de recarga da Calibre 12 acima da guerreira
+        if self.tempo_recarga > 0:
+            larg = 28
+            progresso = 1.0 - min(1.0, self.tempo_recarga / self.RECARGA_12)
+            bx = cx - larg // 2
+            by = rect.y - 10
+            pygame.draw.rect(tela, (25, 20, 26), (bx - 1, by - 1, larg + 2, 5), border_radius=2)
+            pygame.draw.rect(tela, config.DOURADO, (bx, by, int(larg * progresso), 3), border_radius=1)

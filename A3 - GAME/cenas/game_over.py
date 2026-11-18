@@ -7,8 +7,9 @@ class GameOver(Cena):
     def __init__(self, jogo, numero):
         super().__init__(jogo)
         self.numero = numero
-        self.fonte_titulo = pygame.font.Font(None, 80)
-        self.fonte_texto = pygame.font.Font(None, 36)
+        self.fonte_titulo = pygame.font.Font(None, 78)
+        self.fonte_sub = pygame.font.Font(None, 38)
+        self.fonte_texto = pygame.font.Font(None, 34)
 
     def eventos(self, eventos):
         for e in eventos:
@@ -22,9 +23,10 @@ class GameOver(Cena):
 
     def desenhar(self, tela):
         tela.fill(config.PRETO)
-        self._centralizar(tela, "A chama se apagou...", self.fonte_titulo, config.VERMELHO, 190)
-        self._centralizar(tela, "ENTER - Tentar de novo", self.fonte_texto, config.BRANCO, 320)
-        self._centralizar(tela, "ESC - Menu", self.fonte_texto, config.CINZA, 370)
+        self._centralizar(tela, "A chama se apagou...", self.fonte_titulo, config.VERMELHO, 175)
+        self._centralizar(tela, f"Você caiu na Fase {self.numero}", self.fonte_sub, config.DOURADO, 245)
+        self._centralizar(tela, f"ENTER - Tentar a Fase {self.numero} de novo", self.fonte_texto, config.BRANCO, 325)
+        self._centralizar(tela, "ESC - Menu", self.fonte_texto, config.CINZA, 375)
 
     def _centralizar(self, tela, texto, fonte, cor, y):
         img = fonte.render(texto, True, cor)

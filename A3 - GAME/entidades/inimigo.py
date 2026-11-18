@@ -33,7 +33,7 @@ class Inimigo:
         if self.vida <= 0:
             self.vivo = False
 
-    def atualizar(self, dt, plataformas):
+    def atualizar(self, dt, plataformas, alvo=None):
         self.tempo_dano = max(0.0, self.tempo_dano - dt)
 
         if self.recuo > 0:
@@ -87,7 +87,6 @@ class Inimigo:
         pygame.draw.rect(tela, cor, r)
         olho_x = r.right - 12 if self.direcao == 1 else r.left + 4
         pygame.draw.rect(tela, (255, 80, 60), (olho_x, r.y + 10, 8, 6))
-        # barrinha de vida (só aparece depois de apanhar)
         if self.vida < self.vida_max:
             pygame.draw.rect(tela, (60, 20, 20), (r.x, r.y - 10, r.width, 5))
             largura = int(r.width * max(self.vida, 0) / self.vida_max)
