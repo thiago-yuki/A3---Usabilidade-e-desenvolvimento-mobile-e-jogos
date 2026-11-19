@@ -3,7 +3,7 @@
 LARGURA = 960
 ALTURA = 540
 FPS = 60
-TITULO = "A Última Chama de Esparta"
+TITULO = "Falling in fears"
 
 # Cores (R, G, B)
 PRETO = (10, 10, 15)
@@ -22,9 +22,9 @@ VELOCIDADE_QUEDA_MAX = 900
 TAMANHO_TILE = 48         # cada caractere do arquivo de mapa vira um quadrado de 48x48 px
 
 # Combate
-VIDA_JOGADOR = 5
+VIDA_JOGADOR = 3
 DANO_ATAQUE = 1
-ATAQUE_DURACAO = 0.18      # s que o golpe fica ativo
+ATAQUE_DURACAO = 0.15      # s que o golpe fica ativo
 ATAQUE_RECARGA = 0.35      # s até poder atacar de novo
 ATAQUE_ALCANCE = 56        # px à frente do Dáron
 TEMPO_INVENCIVEL = 1.0     # s sem levar dano depois de ser atingido

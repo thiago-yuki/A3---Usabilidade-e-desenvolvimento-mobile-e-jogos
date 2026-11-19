@@ -1,7 +1,9 @@
 from nucleo.jogo import Jogo
-from cenas.menu import Menu
+from cenas.introducao import Introducao
 
 if __name__ == "__main__":
     jogo = Jogo()
-    jogo.trocar_cena(Menu(jogo))
+    
+    jogo.trocar_cena(Introducao(jogo))
     jogo.executar()
+9

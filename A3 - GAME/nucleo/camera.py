@@ -1,6 +1,5 @@
 import config
 
-
 class Camera:
     """Decide qual pedaço do mundo aparece na tela e segue o jogador suavemente."""
 
