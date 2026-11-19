@@ -1,7 +1,5 @@
 import math
 import random
-import math
-import random
 import pygame
 import config
 from nucleo.cena import Cena
@@ -12,9 +10,10 @@ from entidades.inimigos_comuns import (
     ZumbiTsunami,
     ZumbiAnciao,
     GuardiaoFloresta,
+    Fantasma,
+    MonstroPalido
 )
 from entidades.obstaculos import OrbeChama
-from entidades.inimigos_comuns import GuerreiroCorrompido, Fantasma, MonstroPalido
 from entidades.projetil import ProjetilPlasma, ParticulaPlasma
 from entidades.reliquia import Reliquia
 from entidades.barreira import Barreira
