@@ -23,7 +23,7 @@ class GameOver(Cena):
 
     def desenhar(self, tela):
         tela.fill(config.PRETO)
-        self._centralizar(tela, "A chama se apagou...", self.fonte_titulo, config.VERMELHO, 175)
+        self._centralizar(tela, "O seu medo venceu...", self.fonte_titulo, config.VERMELHO, 175)
         self._centralizar(tela, f"Você caiu na Fase {self.numero}", self.fonte_sub, config.DOURADO, 245)
         self._centralizar(tela, f"ENTER - Tentar a Fase {self.numero} de novo", self.fonte_texto, config.BRANCO, 325)
         self._centralizar(tela, "ESC - Menu", self.fonte_texto, config.CINZA, 375)

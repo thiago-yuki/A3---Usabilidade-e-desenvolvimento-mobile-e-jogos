@@ -29,7 +29,7 @@ class Menu(Cena):
 
     def desenhar(self, tela):
         tela.fill(config.PRETO)
-        self._centralizar(tela, "A Última Chama de Esparta", self.fonte_titulo, config.DOURADO, 180)
+        self._centralizar(tela, "Falling in Fears", self.fonte_titulo, config.DOURADO, 180)
         self._centralizar(tela, "ENTER - Jogar", self.fonte_texto, config.BRANCO, 320)
         self._centralizar(tela, "ESC - Sair", self.fonte_texto, config.CINZA, 370)
         self._centralizar(tela, "[2] Fase 2  |  [3] Fase 3 (atalhos de teste)", self.fonte_pequena, (90, 90, 100), 480)
