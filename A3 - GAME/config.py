@@ -3,7 +3,7 @@
 LARGURA = 960
 ALTURA = 540
 FPS = 60
-TITULO = "Além das Sombras"
+TITULO = "Falling in Fears"
 
 # Cores (R, G, B)
 PRETO = (10, 10, 15)
