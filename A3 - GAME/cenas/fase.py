@@ -219,6 +219,53 @@ class Fase(Cena):
             for _ in range(45)
         ]
 
+        self.almas = []
+        self.luzes_cemiterio = []
+        self.fantasmas_floresta = []
+        self.macas_flutuantes = []
+        self.esporos_verdes = []
+        rng_visual = random.Random(505 + numero)
+        limite_y_visual = min(480, self.altura - 40)
+        if eh_fase_2:
+            for _ in range(26):
+                self.almas.append((
+                    rng_visual.uniform(0, self.largura),
+                    rng_visual.uniform(160, limite_y_visual),
+                    rng_visual.uniform(0, math.tau),
+                    rng_visual.uniform(0.6, 1.5),
+                    rng_visual.randint(8, 15),
+                ))
+            for wx in range(380, self.largura, 650):
+                self.luzes_cemiterio.append((
+                    float(wx),
+                    rng_visual.uniform(250, limite_y_visual),
+                ))
+        elif eh_fase_3:
+            for _ in range(17):
+                self.fantasmas_floresta.append((
+                    rng_visual.uniform(0, self.largura),
+                    rng_visual.uniform(160, limite_y_visual),
+                    rng_visual.uniform(0, math.tau),
+                    rng_visual.uniform(0.6, 1.7),
+                    rng_visual.randint(9, 15),
+                ))
+            for _ in range(19):
+                self.macas_flutuantes.append((
+                    rng_visual.uniform(120, self.largura - 100),
+                    rng_visual.uniform(160, limite_y_visual),
+                    rng_visual.uniform(0, math.tau),
+                    rng_visual.randint(8, 13),
+                    rng_visual.choice(("vermelha", "verde")),
+                ))
+            for _ in range(42):
+                self.esporos_verdes.append((
+                    rng_visual.uniform(0, self.largura),
+                    rng_visual.uniform(160, limite_y_visual),
+                    rng_visual.uniform(0, math.tau),
+                    rng_visual.uniform(0.6, 1.7),
+                    rng_visual.randint(2, 4),
+                ))
+
         self.camera = Camera(self.largura, self.altura)
         self.camera.centralizar(self.jogador.rect)
         self.hud = Hud()
@@ -1243,32 +1290,33 @@ class Fase(Cena):
         pygame.draw.rect(tela, (185, 28, 38), (bx, by, int(larg * proporcao), alt), border_radius=3)
 
     # ---------- desenho: Fase 2 (cemitério) ----------
-    def _desenhar_fundo_cemiterio(self, tela):
+    def _desenhar_fundo_cemiterio(self, tela, apenas_decoracoes=False):
         ox = getattr(self.camera, "offset_x", 0)
         oy = getattr(self.camera, "offset_y", 0)
 
-        clarao = int(self.flash_relampago * 85)
-        for y in range(0, config.ALTURA, 6):
-            fator = y / config.ALTURA
-            r = min(255, int(8 + 14 * fator) + clarao)
-            g = min(255, int(12 + 20 * fator) + clarao)
-            b = min(255, int(24 + 26 * fator) + int(clarao * 1.3))
-            pygame.draw.rect(tela, (r, g, b), (0, y, config.LARGURA, 6))
+        if not apenas_decoracoes:
+            clarao = int(self.flash_relampago * 85)
+            for y in range(0, config.ALTURA, 6):
+                fator = y / config.ALTURA
+                r = min(255, int(8 + 14 * fator) + clarao)
+                g = min(255, int(12 + 20 * fator) + clarao)
+                b = min(255, int(24 + 26 * fator) + int(clarao * 1.3))
+                pygame.draw.rect(tela, (r, g, b), (0, y, config.LARGURA, 6))
 
-        lua_x = int(760 - self.camera.x * 0.06) + ox
-        lua_y = 115 + oy
-        halo_lua = pygame.Surface((260, 260), pygame.SRCALPHA)
-        pygame.draw.circle(halo_lua, (180, 200, 230, 18), (130, 130), 125)
-        pygame.draw.circle(halo_lua, (210, 225, 245, 32), (130, 130), 85)
-        tela.blit(halo_lua, (lua_x - 130, lua_y - 130))
-        pygame.draw.circle(tela, (238, 240, 228), (lua_x, lua_y), 48)
-        pygame.draw.circle(tela, (205, 208, 198), (lua_x - 14, lua_y - 10), 11)
-        pygame.draw.circle(tela, (215, 218, 208), (lua_x + 12, lua_y + 14), 8)
+            lua_x = int(760 - self.camera.x * 0.06) + ox
+            lua_y = 115 + oy
+            halo_lua = pygame.Surface((260, 260), pygame.SRCALPHA)
+            pygame.draw.circle(halo_lua, (180, 200, 230, 18), (130, 130), 125)
+            pygame.draw.circle(halo_lua, (210, 225, 245, 32), (130, 130), 85)
+            tela.blit(halo_lua, (lua_x - 130, lua_y - 130))
+            pygame.draw.circle(tela, (238, 240, 228), (lua_x, lua_y), 48)
+            pygame.draw.circle(tela, (205, 208, 198), (lua_x - 14, lua_y - 10), 11)
+            pygame.draw.circle(tela, (215, 218, 208), (lua_x + 12, lua_y + 14), 8)
 
-        for i in range(-1, 6):
-            cx = int(i * 340 - (self.camera.x * 0.18) % 340) + ox
-            pts = [(cx - 80, config.ALTURA), (cx + 90, 270), (cx + 260, 320), (cx + 420, config.ALTURA)]
-            pygame.draw.polygon(tela, (15, 20, 32), pts)
+            for i in range(-1, 6):
+                cx = int(i * 340 - (self.camera.x * 0.18) % 340) + ox
+                pts = [(cx - 80, config.ALTURA), (cx + 90, 270), (cx + 260, 320), (cx + 420, config.ALTURA)]
+                pygame.draw.polygon(tela, (15, 20, 32), pts)
 
         chao_y = self.altura - (2 * config.TAMANHO_TILE)
         for wx in range(120, self.largura - 100, 280):
@@ -1322,6 +1370,101 @@ class Fase(Cena):
                     pygame.draw.circle(tela, (14, 16, 22), (cx + 3, cy - 12), 4)
                     pygame.draw.polygon(tela, (70, 75, 85), [(cx + 6, cy - 13), (cx + 11, cy - 12), (cx + 6, cy - 10)])
                     pygame.draw.circle(tela, (220, 50, 70), (cx + 4, cy - 13), 1)
+
+    def _desenhar_fantasmas_decorativos(self, tela, fantasmas, parallax_y):
+        tempo = self.t
+        camada = pygame.Surface((config.LARGURA, config.ALTURA), pygame.SRCALPHA)
+
+        for mundo_x, mundo_y, fase, velocidade, tamanho in fantasmas:
+            x = int(
+                mundo_x - self.camera.x * 0.88
+                + math.sin(tempo * 0.45 + fase) * 10
+            )
+            y = int(
+                mundo_y - self.camera.y * parallax_y
+                + math.sin(tempo * velocidade + fase) * 13
+            )
+            if x < -35 or x > config.LARGURA + 35:
+                continue
+
+            alpha = int(90 + (math.sin(tempo * 2 + fase) + 1) * 32)
+            pygame.draw.circle(camada, (159, 191, 194, 24), (x, y), tamanho + 10)
+            pygame.draw.circle(
+                camada, (183, 211, 228, alpha), (x, y - tamanho // 2), tamanho // 2
+            )
+            pygame.draw.ellipse(
+                camada,
+                (155, 190, 210, alpha),
+                (x - tamanho // 2, y - tamanho // 2, tamanho, tamanho),
+            )
+            pygame.draw.polygon(
+                camada,
+                (145, 183, 207, alpha),
+                [
+                    (x - tamanho // 2, y),
+                    (x - tamanho // 3, y + tamanho),
+                    (x, y + tamanho // 2),
+                    (x + tamanho // 3, y + tamanho),
+                    (x + tamanho // 2, y),
+                ],
+            )
+
+        tela.blit(camada, (0, 0))
+
+    def _desenhar_decoracoes_floresta(self, tela):
+        tempo = self.t
+        camada = pygame.Surface((config.LARGURA, config.ALTURA), pygame.SRCALPHA)
+
+        for mundo_x, mundo_y, fase, tamanho, tipo in self.macas_flutuantes:
+            x = int(
+                mundo_x - self.camera.x * 0.86
+                + math.sin(tempo * 0.6 + fase) * 7
+            )
+            y = int(
+                mundo_y - self.camera.y * 0.20
+                + math.sin(tempo * 1.3 + fase) * 12
+            )
+            if x < -30 or x > config.LARGURA + 30:
+                continue
+
+            cor = (174, 47, 48, 225) if tipo == "vermelha" else (101, 164, 54, 225)
+            pygame.draw.circle(camada, (113, 205, 63, 30), (x, y), tamanho + 12)
+            pygame.draw.circle(camada, cor, (x - 4, y), tamanho)
+            pygame.draw.circle(camada, cor, (x + 4, y), tamanho)
+            pygame.draw.ellipse(camada, cor, (x - tamanho, y - 2, tamanho * 2, tamanho + 7))
+            pygame.draw.line(
+                camada, (71, 51, 31, 255), (x, y - tamanho + 2), (x + 2, y - tamanho - 5), 2
+            )
+            pygame.draw.ellipse(
+                camada, (91, 174, 60, 245), (x + 2, y - tamanho - 7, 9, 5)
+            )
+
+        for mundo_x, mundo_y, fase, velocidade, tamanho in self.esporos_verdes:
+            x = int(mundo_x - self.camera.x * 0.76 + math.sin(tempo * 0.5 + fase) * 5)
+            y = int(
+                mundo_y - self.camera.y * 0.28
+                + math.sin(tempo * velocidade + fase) * 13
+            )
+            if x < -10 or x > config.LARGURA + 10:
+                continue
+
+            pulsacao = (math.sin(tempo * 3 + fase) + 1) / 2
+            alpha = int(85 + pulsacao * 105)
+            pygame.draw.circle(camada, (111, 211, 82, 30), (x, y), tamanho + 6)
+            pygame.draw.circle(camada, (151, 219, 97, alpha), (x, y), tamanho)
+
+        tela.blit(camada, (0, 0))
+
+    def _desenhar_luzes_cemiterio(self, tela):
+        camada = pygame.Surface((config.LARGURA, config.ALTURA), pygame.SRCALPHA)
+        for i, (mundo_x, mundo_y) in enumerate(self.luzes_cemiterio):
+            x = int(mundo_x - self.camera.x)
+            y = int(mundo_y - self.camera.y + math.sin(self.t * 1.7 + i) * 5)
+            if x < -40 or x > config.LARGURA + 40:
+                continue
+            pygame.draw.circle(camada, (98, 177, 226, 45), (x, y), 27)
+            pygame.draw.circle(camada, (220, 238, 247, 215), (x, y), 3)
+        tela.blit(camada, (0, 0))
 
     def _desenhar_plataformas_cemiterio(self, tela):
         for p in self.plataformas:
@@ -1416,6 +1559,15 @@ class Fase(Cena):
         tela.blit(self.imagem_fundo, (0, 0))
         if self.numero == 1:
             self._desenhar_efeitos_fase1(tela)
+        elif self.numero == 2:
+            self._desenhar_fundo_cemiterio(tela, apenas_decoracoes=True)
+            self._desenhar_fantasmas_decorativos(tela, self.almas, 0.30)
+            self._desenhar_luzes_cemiterio(tela)
+        elif self.numero == 3:
+            self._desenhar_fantasmas_decorativos(
+                tela, self.fantasmas_floresta, 0.25
+            )
+            self._desenhar_decoracoes_floresta(tela)
 
         for lap in self.lapides:
             lap.desenhar(tela, self.camera)

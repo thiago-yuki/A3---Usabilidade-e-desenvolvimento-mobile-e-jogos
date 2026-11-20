@@ -24,10 +24,10 @@ class DadosMapa:
         self.espinhos = []       # GalhosEspinhos 'G' (causam dano no chão)
         self.vinhas = []         # VinhaEspinhosa 'V' (causam dano suspensas)
         self.cipos = []          # CipoEscalada 'H' (escaláveis)
-        self.armadilhas = []     # ArmadilhaCacador 'M' (fecham e causam dano)
+        self.armadilhas = []     # ArmadilhaCacador 'M' na Fase 3
         self.lapides = []        # LapideAntiga 'R' (decoração sombria)
         self.inimigos = []       # (x_centro, y_base)
-        self.chefe = None       # (x_centro, y_base) para 'M'
+        self.chefe = None        # (x_centro, y_base) para 'M' na Fase 2
         self.zumbis = []         # (x_centro, y_base) dos zumbis caçadores 'Z'
         self.zumbis_brutos = []  # (x_centro, y_base) dos zumbis anciãos 'W'
         self.chefes = []         # (x_centro, y_base) do Guardião da Floresta 'C'
@@ -56,7 +56,7 @@ def carregar_mapa(numero):
       #  bloco sólido            P  início                  E  inimigo comum
       Z  zumbi caçador           W  zumbi ancião (bruto)    C  chefe guardião
       T  tocha (iluminação)      L  tronco caído / toco     G  galhos secos/espinhos
-      V  vinha espinhosa aérea   H  cipó/raiz de escalada   M  armadilha de caçador
+      V  vinha espinhosa aérea   H  cipó/raiz de escalada   M  chefe (Fase 2) / armadilha (Fase 3)
       R  lápide antiga / cruz    B  barreira rachada        S  saída (portal)
       J  relíquia salto duplo    A  relíquia avanço         .  vazio
     """
@@ -95,7 +95,11 @@ def carregar_mapa(numero):
                 dados.espinhos.append(GalhosEspinhos(ini * t, (r + 1) * t, (c - ini) * t))
                 continue
             if ch == "M":
-                dados.armadilhas.append(ArmadilhaCacador(c * t + t // 2, (r + 1) * t))
+                posicao = (c * t + t // 2, (r + 1) * t)
+                if numero == 2:
+                    dados.chefe = posicao
+                else:
+                    dados.armadilhas.append(ArmadilhaCacador(*posicao))
             elif ch == "P":
                 dados.inicio = (c * t + t // 2, (r + 1) * t)
             elif ch == "E":
@@ -110,8 +114,6 @@ def carregar_mapa(numero):
                 dados.tochas.append((c * t + t // 2, r * t + t // 2))
             elif ch == "R":
                 dados.lapides.append(LapideAntiga(c * t + t // 2, (r + 1) * t, variante=c + r))
-            elif ch == "M":
-                dados.chefe = (c * t + t // 2, (r + 1) * t)
             elif ch == "H":
                 dados.curas.append((c * t + t // 2, r * t + t // 2))
             elif ch == "T":
