@@ -57,8 +57,9 @@ class Jogador:
     ALTURA = 56
     RECARGA_12 = 0.52
 
-    def __init__(self, x, y, modo_guerreira=False):
+    def __init__(self, x, y, modo_guerreira=False, aparencia_guerreira=False):
         self.modo_guerreira = modo_guerreira
+        self.aparencia_guerreira = modo_guerreira or aparencia_guerreira
         self.inicio = (x, y)
         self.rect = pygame.Rect(x, y, self.LARGURA, self.ALTURA)
         self.pos = pygame.Vector2(x, y)
@@ -360,7 +361,7 @@ class Jogador:
 
         rect = camera.aplicar(self.rect)
 
-        if self.modo_guerreira:
+        if self.aparencia_guerreira:
             self._desenhar_guerreira(tela, rect)
             return
 

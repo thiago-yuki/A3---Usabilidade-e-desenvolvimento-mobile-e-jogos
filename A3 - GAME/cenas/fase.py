@@ -1,4 +1,5 @@
 import math
+import os
 import random
 import pygame
 import config
@@ -70,6 +71,20 @@ class Fase(Cena):
         eh_fase_2 = (numero == 2)
         eh_fase_3 = (numero == 3)
 
+        nomes_fundos = {
+            1: "fundo_fase1.png",
+            2: "fundo_fase2.jpeg",
+            3: "fundo_fase3.jpeg",
+        }
+        raiz_projeto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        caminho_fundo = os.path.join(
+            raiz_projeto, "assets", nomes_fundos[numero]
+        )
+        self.imagem_fundo = pygame.transform.smoothscale(
+            pygame.image.load(caminho_fundo).convert(),
+            (config.LARGURA, config.ALTURA),
+        )
+
         self.habilidades_entrada = set(jogo.habilidades)
         self.fonte = pygame.font.Font(None, 28)
         self.fonte_msg = pygame.font.Font(None, 40)
@@ -92,6 +107,8 @@ class Fase(Cena):
         self.lapides = dados.lapides
         self.solidos = self.plataformas + self.barreiras + self.troncos
         self.saida = Saida(*dados.saida) if dados.saida else None
+        if self.saida:
+            self.saida.design_fase1 = (numero == 1)
         if self.saida and eh_fase_2:
             self.saida.bizarro = True
 
@@ -110,7 +127,12 @@ class Fase(Cena):
             self.jogador.desbloquear("salto_duplo")
             self.jogador.desbloquear("avanco")
         else:
-            self.jogador = Jogador(x - Jogador.LARGURA // 2, y - Jogador.ALTURA, modo_guerreira=eh_fase_3)
+            self.jogador = Jogador(
+                x - Jogador.LARGURA // 2,
+                y - Jogador.ALTURA,
+                modo_guerreira=eh_fase_3,
+                aparencia_guerreira=(numero == 1),
+            )
         for habilidade in jogo.habilidades:
             self.jogador.desbloquear(habilidade)
 
@@ -1329,13 +1351,71 @@ class Fase(Cena):
                 pygame.draw.circle(tela, (150, 230, 235), (ex, ey), 2)
 
     # ---------- desenho: cena ----------
-    def _desenhar_mundo(self, tela):
-        tela.fill(FUNDOS.get(self.numero, (25, 20, 30)))
+    def _desenhar_efeitos_fase1(self, tela):
+        nevoa = pygame.Surface((config.LARGURA, 110), pygame.SRCALPHA)
+        deslocamento = int(self.t * 14 + self.camera.x * 0.12) % 320
+        for i in range(5):
+            x = (i * 250 - deslocamento) % (config.LARGURA + 280) - 140
+            y = 30 + int(math.sin(self.t * 0.5 + i) * 12)
+            pygame.draw.ellipse(
+                nevoa,
+                (157, 136, 190, 22),
+                (x, y, 210, 45),
+            )
+        tela.blit(nevoa, (0, config.ALTURA - 112))
 
-        if self.numero == 2:
-            self._desenhar_fundo_cemiterio(tela)
-        elif self.numero == 3:
-            self._desenhar_fundo_floresta(tela)
+        particulas = pygame.Surface(
+            (config.LARGURA, config.ALTURA), pygame.SRCALPHA
+        )
+        for mundo_x, mundo_y, velocidade, fase in self.esporos:
+            x = int(mundo_x - self.camera.x * 0.8)
+            y = int(
+                mundo_y - self.camera.y * 0.35
+                + math.sin(self.t * velocidade + fase) * 8
+            )
+            if -12 <= x <= config.LARGURA + 12 and 0 <= y <= config.ALTURA:
+                pygame.draw.circle(particulas, (183, 151, 226, 75), (x, y), 3)
+                pygame.draw.circle(particulas, (228, 213, 250, 170), (x, y), 1)
+        tela.blit(particulas, (0, 0))
+
+    def _desenhar_inimigo_fase1(self, tela, inimigo):
+        r = self.camera.aplicar(inimigo.rect)
+        if r.right < -30 or r.left > config.LARGURA + 30:
+            return
+
+        pulinho = int((math.sin(self.t * 7 + inimigo.rect.x) + 1) * 1.5)
+        topo = r.y - pulinho
+        cx = r.centerx
+        corpo = (238, 238, 240) if inimigo.tempo_dano > 0 else (164, 49, 62)
+        sombra = (120, 35, 48) if inimigo.tempo_dano <= 0 else (205, 205, 210)
+        pygame.draw.ellipse(tela, (24, 19, 34), (r.x + 5, r.bottom - 5, r.width - 10, 8))
+        pygame.draw.ellipse(tela, sombra, (r.x + 3, topo + 14, r.width - 6, r.height - 15))
+        pygame.draw.ellipse(tela, corpo, (r.x + 5, topo + 10, r.width - 10, r.height - 17))
+
+        olho_y = topo + 15
+        for olho_x in (cx - 9, cx + 9):
+            pygame.draw.circle(tela, (201, 88, 85), (olho_x, olho_y), 7)
+            pygame.draw.circle(tela, (241, 220, 163), (olho_x, olho_y), 4)
+            pupila_x = olho_x + inimigo.direcao
+            pygame.draw.circle(tela, (35, 25, 30), (pupila_x, olho_y), 2)
+
+        pygame.draw.ellipse(
+            tela,
+            (201, 93, 100) if inimigo.tempo_dano <= 0 else (245, 245, 245),
+            (cx - 8, topo + 29, 16, 10),
+        )
+        pygame.draw.line(tela, (63, 23, 36), (cx - 8, topo + 27), (cx - 2, topo + 29), 2)
+        pygame.draw.line(tela, (63, 23, 36), (cx + 8, topo + 27), (cx + 2, topo + 29), 2)
+
+        if inimigo.vida < inimigo.vida_max:
+            pygame.draw.rect(tela, (55, 20, 30), (r.x, topo - 7, r.width, 4))
+            largura_vida = int(r.width * max(inimigo.vida, 0) / inimigo.vida_max)
+            pygame.draw.rect(tela, config.VERMELHO, (r.x, topo - 7, largura_vida, 4))
+
+    def _desenhar_mundo(self, tela):
+        tela.blit(self.imagem_fundo, (0, 0))
+        if self.numero == 1:
+            self._desenhar_efeitos_fase1(tela)
 
         for lap in self.lapides:
             lap.desenhar(tela, self.camera)
@@ -1348,7 +1428,7 @@ class Fase(Cena):
             self._desenhar_solo_floresta(tela)
         else:
             for p in self.plataformas:
-                p.desenhar(tela, self.camera)
+                p.desenhar(tela, self.camera, tema=self.numero)
 
         for cipo in self.cipos:
             cipo.desenhar(tela, self.camera)
@@ -1361,7 +1441,7 @@ class Fase(Cena):
         for arm in self.armadilhas:
             arm.desenhar(tela, self.camera)
         for b in self.barreiras:
-            b.desenhar(tela, self.camera)
+            b.desenhar(tela, self.camera, tema=self.numero)
         for escada in self.escadas:
             escada.desenhar(tela, self.camera)
 
@@ -1391,7 +1471,10 @@ class Fase(Cena):
         for orbe in self.orbes_cura:
             orbe.desenhar(tela, self.camera)
         for inimigo in self.inimigos:
-            inimigo.desenhar(tela, self.camera)
+            if self.numero == 1:
+                self._desenhar_inimigo_fase1(tela, inimigo)
+            else:
+                inimigo.desenhar(tela, self.camera)
         for onda in self.ondas_sombrias:
             onda.desenhar(tela, self.camera)
 
@@ -1410,11 +1493,6 @@ class Fase(Cena):
             img = self.fonte_combo.render(tf[2], True, tf[4])
             tela.blit(img, img.get_rect(center=pos))
 
-        if self.numero == 2:
-            self._desenhar_atmosfera_frente(tela)
-        elif self.numero == 3:
-            self._desenhar_iluminacao(tela)
-
     def desenhar(self, tela):
         # Tremor de tela da Fase (a câmera é restaurada ao fim do desenho do mundo)
         cam_orig = (self.camera.x, self.camera.y)
@@ -1427,7 +1505,7 @@ class Fase(Cena):
             self.camera.x, self.camera.y = cam_orig
 
         # ---------- interface (sem tremor) ----------
-        self.hud.desenhar(tela, self.jogador)
+        self.hud.desenhar(tela, self.jogador, self.numero)
         self._desenhar_barra_chefe(tela)
 
         if self.tempo_tiro_triplo > 0:
@@ -1440,7 +1518,7 @@ class Fase(Cena):
             ajuda = f"Fase {self.numero} | A-D: andar | W/S: escalar | ESPAÇO: pular | J/X: atirar | ESC: menu"
         else:
             ajuda = f"Fase {self.numero} | A-D: andar | ESPAÇO: pular | J/X: atacar | ESC: menu"
-        tela.blit(self.fonte.render(ajuda, True, config.CINZA), (12, 10))
+        self.hud.desenhar_comandos(tela, ajuda)
 
         if self.mensagem and self.tempo_mensagem > 0:
             titulo, descricao = self.mensagem
