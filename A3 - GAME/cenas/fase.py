@@ -108,7 +108,7 @@ class Fase(Cena):
         self.solidos = self.plataformas + self.barreiras + self.troncos
         self.saida = Saida(*dados.saida) if dados.saida else None
         if self.saida:
-            self.saida.design_fase1 = (numero == 1)
+            self.saida.design_decorado = numero in (1, 3)
         if self.saida and eh_fase_2:
             self.saida.bizarro = True
 
@@ -1668,6 +1668,8 @@ class Fase(Cena):
             ajuda = f"Fase {self.numero} | A-D: andar | W/S: escada | ESPAÇO: pular | K/SHIFT: dash hitkill | J/X: plasma"
         elif self.numero == 3:
             ajuda = f"Fase {self.numero} | A-D: andar | W/S: escalar | ESPAÇO: pular | J/X: atirar | ESC: menu"
+        elif self.numero == 1:
+            ajuda = f"Fase {self.numero} | A-D: andar | ESPAÇO: pular | ESC: menu"
         else:
             ajuda = f"Fase {self.numero} | A-D: andar | ESPAÇO: pular | J/X: atacar | ESC: menu"
         self.hud.desenhar_comandos(tela, ajuda)

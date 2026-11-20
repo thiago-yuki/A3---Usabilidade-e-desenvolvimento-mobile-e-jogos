@@ -19,7 +19,7 @@ class DadosMapa:
     def __init__(self):
         self.plataformas = []    # blocos '#'
         self.barreiras = []      # (x, y, largura, altura) de cada parede 'B'
-        self.escadas = []       # objetos Escada de cada coluna 'L'
+        self.escadas = []       # objetos Escada de cada coluna 'L' na Fase 2
         self.troncos = []        # TroncoCaido 'L' (sólidos)
         self.espinhos = []       # GalhosEspinhos 'G' (causam dano no chão)
         self.vinhas = []         # VinhaEspinhosa 'V' (causam dano suspensas)
@@ -83,10 +83,13 @@ def carregar_mapa(numero):
                 dados.plataformas.append(Plataforma(ini * t, r * t, (c - ini) * t, t))
                 continue
             if ch == "L":
-                ini = c
-                while c < colunas and linha[c] == "L":
+                if numero == 2:
                     c += 1
-                dados.troncos.append(TroncoCaido(ini * t, r * t, (c - ini) * t, t))
+                else:
+                    ini = c
+                    while c < colunas and linha[c] == "L":
+                        c += 1
+                    dados.troncos.append(TroncoCaido(ini * t, r * t, (c - ini) * t, t))
                 continue
             if ch == "G":
                 ini = c
@@ -145,7 +148,7 @@ def carregar_mapa(numero):
                 while r < len(linhas) and linhas[r][c] == "H":
                     r += 1
                 dados.cipos.append(CipoEscalada(c * t + t // 2, ini * t, (r - ini) * t))
-            elif linhas[r][c] == "L":
+            elif numero == 2 and linhas[r][c] == "L":
                 ini = r
                 while r < len(linhas) and linhas[r][c] == "L":
                     r += 1

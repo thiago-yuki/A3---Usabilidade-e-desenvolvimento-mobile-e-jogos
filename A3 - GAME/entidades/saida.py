@@ -12,12 +12,12 @@ class Saida:
         self.t = 0.0
         self.bizarro = False
         self.selado = False
-        self.design_fase1 = False
+        self.design_decorado = False
 
     def atualizar(self, dt):
         self.t += dt
 
-    def _desenhar_portal_fase1(self, tela, r):
+    def _desenhar_portal_decorado(self, tela, r):
         tempo = self.t
         pulso = (math.sin(tempo * 2.5) + 1) / 2
         margem = 22
@@ -71,8 +71,8 @@ class Saida:
             return
 
         if not self.bizarro:
-            if self.design_fase1:
-                self._desenhar_portal_fase1(tela, r)
+            if self.design_decorado:
+                self._desenhar_portal_decorado(tela, r)
                 return
             pygame.draw.ellipse(tela, config.DOURADO, r, 4)
             pygame.draw.ellipse(tela, (90, 60, 20), r.inflate(-16, -16))
