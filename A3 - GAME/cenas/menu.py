@@ -882,10 +882,10 @@ class Menu(Cena):
             self._conteudo_secundario(
                 alvo, self.titulo_creditos,
                 [
-                    ("Uma aventura criada por nossa equipe",
+                    ("Uma aventura criada por Adriel, Fernanda, Lucas, Rayssa, Thiago e Wadja",
                      self.fonte_secundaria, self.branco, 0.42),
                     ("FALLING IN FEARS",
-                     self.fonte_subtitulo, self.cinza, 0.52),
+                     self.fonte_subtitulo, self.cinza, 0.58),
                 ]
             )
 
@@ -1144,7 +1144,7 @@ class Menu(Cena):
             self._texto(
                 alvo, "Setas para navegar   ·   ENTER para confirmar",
                 self.fonte_pequena, (195, 180, 150),
-                (self.centro, int(A * 0.925)), pulso
+                (self.centro, int(A * 0.89)), pulso
             )
 
     # =====================================================
@@ -1163,8 +1163,23 @@ class Menu(Cena):
             alvo, self.centro, int(A * 0.315), int(170 * k)
         )
 
+        largura_texto = self.painel_rect.width - int(80 * k)
         for texto, fonte, cor, y in linhas:
-            self._texto(alvo, texto, fonte, cor, (self.centro, int(A * y)))
+            linhas_texto = self._quebrar_linhas(
+                texto, fonte, largura_texto
+            )
+            altura_linha = fonte.get_linesize()
+            centro_y = int(A * y)
+            inicio_y = centro_y - (len(linhas_texto) - 1) * altura_linha // 2
+
+            for indice, linha in enumerate(linhas_texto):
+                self._texto(
+                    alvo,
+                    linha,
+                    fonte,
+                    cor,
+                    (self.centro, inicio_y + indice * altura_linha),
+                )
 
         self._desenhar_botao(
             alvo, "VOLTAR", self.botao_voltar, self.hover["VOLTAR"], 1.0
