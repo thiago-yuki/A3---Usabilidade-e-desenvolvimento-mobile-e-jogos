@@ -64,6 +64,162 @@ class Particula:
             pygame.draw.circle(tela, self.cor, (sx, sy), raio)
 
 
+class PedacoOrgao:
+    """Pedaço visceral (coração, olho, costela, carne) lançado na explosão do chefe da Fase 2."""
+
+    def __init__(self, x, y, vx, vy, tipo):
+        self.x = float(x)
+        self.y = float(y)
+        self.vx = float(vx)
+        self.vy = float(vy)
+        self.tipo = tipo  # "coracao", "olho", "costela", "carne"
+        self.angulo = random.uniform(0, math.tau)
+        self.vel_ang = random.uniform(-11.0, 11.0)
+        self.vida = random.uniform(2.6, 3.8)
+        self.rastro_timer = 0.0
+
+    def atualizar(self, dt, solidos, particulas):
+        self.vida -= dt
+        self.vy += 680.0 * dt
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+        self.angulo += self.vel_ang * dt
+
+        # Rastro de sangue enquanto voa
+        self.rastro_timer -= dt
+        if self.rastro_timer <= 0 and abs(self.vy) + abs(self.vx) > 90:
+            self.rastro_timer = 0.045
+            particulas.append(Particula(
+                self.x, self.y,
+                random.uniform(-25, 25), random.uniform(-20, 20),
+                (165, 18, 32), raio=3, vida=0.45, gravidade=260.0
+            ))
+
+        # Colisão e quique no chão
+        rect = pygame.Rect(round(self.x) - 6, round(self.y) - 6, 12, 12)
+        for s in solidos:
+            if rect.colliderect(s.rect):
+                if self.vy > 0 and self.y - self.vy * dt <= s.rect.top + 8:
+                    self.y = float(s.rect.top - 6)
+                    self.vy = -self.vy * 0.42
+                    self.vx *= 0.68
+                    self.vel_ang *= 0.55
+                    if abs(self.vy) < 45:
+                        self.vy = 0.0
+                        self.vx *= 0.4
+                        self.vel_ang = 0.0
+                else:
+                    self.vx = -self.vx * 0.5
+                break
+
+    def desenhar(self, tela, camera):
+        if self.vida <= 0:
+            return
+        sx = round(self.x - camera.x)
+        sy = round(self.y - camera.y)
+        if sx < -40 or sx > config.LARGURA + 40:
+            return
+
+        if self.tipo == "coracao":
+            pygame.draw.circle(tela, (150, 18, 36), (sx - 3, sy - 2), 6)
+            pygame.draw.circle(tela, (175, 24, 44), (sx + 3, sy - 2), 6)
+            pygame.draw.polygon(tela, (135, 14, 30), [(sx - 8, sy), (sx + 8, sy), (sx, sy + 9)])
+            pygame.draw.line(tela, (215, 70, 85), (sx - 2, sy - 7), (sx - 4, sy - 12), 2)
+        elif self.tipo == "olho":
+            pygame.draw.circle(tela, (235, 232, 225), (sx, sy), 7)
+            pygame.draw.circle(tela, (190, 25, 35), (sx + 2, sy), 3)
+            pygame.draw.circle(tela, (15, 10, 15), (sx + 2, sy), 1)
+            pygame.draw.line(tela, (165, 22, 34), (sx - 6, sy), (sx - 13, sy + 3), 2)
+        elif self.tipo == "costela":
+            dx = round(math.cos(self.angulo) * 9)
+            dy = round(math.sin(self.angulo) * 9)
+            pygame.draw.line(tela, (225, 218, 198), (sx - dx, sy - dy), (sx + dx, sy + dy), 4)
+            pygame.draw.circle(tela, (160, 22, 34), (sx - dx, sy - dy), 3)
+        else:  # carne / víscera
+            pygame.draw.ellipse(tela, (138, 22, 36), (sx - 8, sy - 5, 16, 10))
+            pygame.draw.ellipse(tela, (185, 48, 62), (sx - 5, sy - 3, 9, 5))
+
+
+class GosmaDerretida:
+    """Animação de derretimento do chefe da Fase 3 como uma poça de gosma tóxica."""
+
+    def __init__(self, x, bottom_y, largura):
+        self.x = float(x)
+        self.bottom_y = float(bottom_y)
+        self.largura_ini = float(largura)
+        self.altura_ini = 92.0
+        self.t = 0.0
+        self.duracao = 2.8
+        self.ativo = True
+        self.bolhas = [
+            [random.uniform(-0.42, 0.42), random.uniform(0, math.tau), random.uniform(3.5, 6.5)]
+            for _ in range(9)
+        ]
+
+    def atualizar(self, dt, particulas):
+        self.t += dt
+        if self.t >= self.duracao:
+            self.ativo = False
+            return
+
+        prog = min(1.0, self.t / (self.duracao * 0.72))
+        larg_atual = self.largura_ini * (1.0 + prog * 1.45)
+
+        if random.random() < 0.35:
+            gx = self.x + random.uniform(-larg_atual * 0.45, larg_atual * 0.45)
+            particulas.append(Particula(
+                gx, self.bottom_y - 6,
+                random.uniform(-35, 35), random.uniform(-95, -35),
+                (118, 195, 48), raio=3, vida=0.45, gravidade=220.0
+            ))
+
+    def desenhar(self, tela, camera):
+        if not self.ativo:
+            return
+        prog = min(1.0, self.t / (self.duracao * 0.72))
+        fade = 1.0 if self.t < self.duracao * 0.72 else max(0.0, 1.0 - (self.t - self.duracao * 0.72) / (self.duracao * 0.28))
+
+        larg = round(self.largura_ini * (1.0 + prog * 1.45))
+        alt = max(10, round(self.altura_ini * (1.0 - prog * 0.88)))
+
+        sx = round(self.x - camera.x)
+        sy = round(self.bottom_y - camera.y)
+        if sx + larg < -60 or sx - larg > config.LARGURA + 60:
+            return
+
+        surf = pygame.Surface((larg + 40, alt + 24), pygame.SRCALPHA)
+        cx = (larg + 40) // 2
+        base_y = alt + 16
+        alpha = int(235 * fade)
+
+        # Poça espalhada na base
+        pygame.draw.ellipse(surf, (48, 86, 24, alpha), (10, base_y - 12, larg + 20, 18))
+        pygame.draw.ellipse(surf, (84, 146, 36, alpha), (18, base_y - 10, larg + 4, 13))
+
+        # Corpo central escorrendo e derretendo
+        if alt > 12:
+            topo_w = max(16, int(larg * (0.62 - prog * 0.35)))
+            corpo = [
+                (cx - larg // 2, base_y - 4),
+                (cx - topo_w // 2, base_y - alt),
+                (cx + topo_w // 2, base_y - alt),
+                (cx + larg // 2, base_y - 4),
+            ]
+            pygame.draw.polygon(surf, (66, 118, 30, alpha), corpo)
+            pygame.draw.ellipse(surf, (108, 178, 44, alpha), (cx - topo_w // 2, base_y - alt - 5, topo_w, 12))
+
+        # Bolhas ácidas estourando na gosma
+        for desloc_x, fase, r_max in self.bolhas:
+            bx = cx + int(desloc_x * larg)
+            pulso = (math.sin(self.t * 6.0 + fase) + 1.0) * 0.5
+            r = max(2, int(r_max * pulso))
+            by = base_y - 6 - int(pulso * min(12, alt * 0.45))
+            pygame.draw.circle(surf, (148, 224, 62, alpha), (bx, by), r)
+            pygame.draw.circle(surf, (210, 250, 140, alpha), (bx - 1, by - 1), max(1, r // 2))
+
+        tela.blit(surf, (sx - cx, sy - base_y))
+
+
 class Fase(Cena):
     def __init__(self, jogo, numero=1):
         super().__init__(jogo)
@@ -116,22 +272,17 @@ class Fase(Cena):
         self.reliquias = [Reliquia(t, x, y) for t, x, y in dados.reliquias
                           if t not in jogo.habilidades]
 
-        # ---------- jogador (criado uma única vez) ----------
-        # Fase 2: JogadorPlasma (rifle de plasma, escada, dash hitkill).
-        # Fase 3: Jogador em modo guerreira (calibre 12, cipós, parede).
-        # Demais fases: Jogador com golpe corpo a corpo.
+        # ---------- jogador ----------
         x, y = dados.inicio
         if eh_fase_2:
             self.jogador = JogadorPlasma(x - JogadorPlasma.LARGURA // 2, y - JogadorPlasma.ALTURA)
             self.jogador.estilo = "guerreira"
-            self.jogador.desbloquear("salto_duplo")
-            self.jogador.desbloquear("avanco")
         else:
+            arma = "besta" if eh_fase_3 else "espingarda"
             self.jogador = Jogador(
                 x - Jogador.LARGURA // 2,
                 y - Jogador.ALTURA,
-                modo_guerreira=eh_fase_3,
-                aparencia_guerreira=(numero == 1),
+                modo_arma=arma,
             )
         for habilidade in jogo.habilidades:
             self.jogador.desbloquear(habilidade)
@@ -153,12 +304,18 @@ class Fase(Cena):
             self.inimigos = [GuerreiroCorrompido(ix, iy) for ix, iy in dados.inimigos]
             self.inimigos += [ZumbiTsunami(ix, iy) for ix, iy in getattr(dados, "zumbis", [])]
             self.inimigos += [ZumbiAnciao(ix, iy) for ix, iy in getattr(dados, "zumbis_brutos", [])]
-            self.inimigos += [GuardiaoFloresta(ix, iy) for ix, iy in getattr(dados, "chefes", [])]
+            for ix, iy in getattr(dados, "chefes", []):
+                guardiao = GuardiaoFloresta(ix, iy)
+                self.inimigos.append(guardiao)
+                if self.chefe is None:
+                    self.chefe = guardiao
 
         # ---------- listas de efeitos / objetos ----------
         self.projeteis = []
         self.ondas_sombrias = []
         self.particulas = []
+        self.pedacos_orgaos = []
+        self.gosmas_derretidas = []
         self.orbes_cura = []
         self.orbes_inimigos = []
         self.vagalumes = []
@@ -172,7 +329,6 @@ class Fase(Cena):
         self.powerups = [pygame.Rect(px - 14, py - 14, 28, 28) for px, py in dados.powerups]
         self.tempo_tiro_triplo = 0.0
 
-        # Controle da horda dinâmica de zumbis na Fase 3
         self.zumbis_derrotados = 0
         self.zumbis_nascidos_extra = 0
         self.max_zumbis_extra = 38
@@ -183,14 +339,13 @@ class Fase(Cena):
         self.shake_forca = 0
         self.aviso_portal_cooldown = 0.0
 
-        # Hitstop, relâmpagos visuais e combo aéreo (Fase 2)
         self.hitstop = 0.0
         self.proximo_relampago = random.uniform(7.0, 12.0)
         self.flash_relampago = 0.0
         self.combo_dash = 0
-        self.textos_flutuantes = []  # [x, y, texto, tempo, cor]
+        self.dash_acertados = set()
+        self.textos_flutuantes = []
 
-        # Corvos pousados nas lápides e cruzes do cemitério (Fase 2)
         self.corvos = []
         if eh_fase_2:
             chao_y = self.altura - (2 * config.TAMANHO_TILE)
@@ -237,15 +392,13 @@ class Fase(Cena):
             self._gerar_floresta_sombria()
             self.mensagem = (
                 "Fase 3 - As Profundezas da Floresta Sombria",
-                "Os zumbis escalam atrás de você! Derrote a Abominação Derretida no final!",
+                "Use sua Besta de 3 Virotes (J/X) e Dash Hitkill! Derrote a Abominação Derretida no final!",
             )
             self.tempo_mensagem = 4.5
 
     # ---------- utilidades ----------
     def _som(self, nome):
-        """Os sons só existem na Fase 2; nas demais a chamada é ignorada."""
-        if self.numero == 2:
-            self.sons.tocar(nome)
+        self.sons.tocar(nome)
 
     def _chefe_ativo(self):
         if self.chefe and self.chefe.vivo:
@@ -260,14 +413,12 @@ class Fase(Cena):
         self.shake_forca = max(self.shake_forca, forca)
 
     def _tremer(self, forca, duracao):
-        """Tremor único para as duas fases (a Fase 2 usa o tremor da Camera; as demais, o da Fase)."""
         if self.numero == 2 and hasattr(self.camera, "tremer"):
             self.camera.tremer(forca, duracao)
         else:
             self._tremer_camera(duracao, forca)
 
     def _trepaveis(self):
-        """Objetos que o jogador pode escalar: escadas na Fase 2; cipós/escadas nas demais."""
         if self.numero == 2:
             return self.escadas
         return list(self.cipos) + list(self.escadas)
@@ -287,8 +438,34 @@ class Fase(Cena):
                 gravidade=grav,
             ))
 
+    def _explodir_orgaos_chefe(self, chefe):
+        cx, cy = chefe.rect.centerx, chefe.rect.centery
+        tipos = ["coracao", "olho", "olho", "costela", "costela", "costela", "carne", "carne", "carne", "carne", "carne", "carne"]
+        for tipo in tipos:
+            vx = random.uniform(-340, 340)
+            if abs(vx) < 70:
+                vx = 110 if vx >= 0 else -110
+            vy = random.uniform(-420, -140)
+            self.pedacos_orgaos.append(PedacoOrgao(
+                cx + random.randint(-14, 14),
+                cy + random.randint(-16, 10),
+                vx, vy, tipo
+            ))
+        self._emitir_particulas(
+            cx, cy, 48, (165, 18, 32),
+            vel_x=(-260, 260), vel_y=(-300, -40), raio=5, vida=0.85, grav=420.0
+        )
+
+    def _derreter_chefe_gosma(self, chefe):
+        self.gosmas_derretidas.append(
+            GosmaDerretida(chefe.rect.centerx, chefe.rect.bottom, chefe.rect.width)
+        )
+        self._emitir_particulas(
+            chefe.rect.centerx, chefe.rect.centery, 36, (108, 178, 44),
+            vel_x=(-200, 200), vel_y=(-190, -20), raio=5, vida=0.75, grav=320.0
+        )
+
     def _gerar_floresta_sombria(self):
-        """Gera árvores sombrias, arbustos, morcegos, olhos vermelhos no fundo e vaga-lumes."""
         rng = random.Random(303)
         solo_y = self.altura - config.TAMANHO_TILE * 2
 
@@ -389,27 +566,27 @@ class Fase(Cena):
                 from cenas.menu import Menu
                 self.jogo.trocar_cena(Menu(self.jogo))
             elif e.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
-                # W/↑ perto de escada ou cipó serve para escalar, não para pular
                 if e.key in (pygame.K_w, pygame.K_UP) and self._tocando_trepavel():
                     continue
-                if self.jogador.pular() and self.numero == 2:
-                    self.sons.tocar("pulo")
+                if self.jogador.pular():
+                    self._som("pulo")
             elif e.key in (pygame.K_j, pygame.K_x):
                 self._atirar()
             elif e.key in (pygame.K_k, pygame.K_LSHIFT, pygame.K_RSHIFT):
-                if self.jogador.avancar() and self.numero == 2:
-                    self.sons.tocar("dash")
+                if self.jogador.avancar():
+                    self.dash_acertados.clear()
                     self._tremer(3, 0.08)
+                    self._som("dash")
 
     def _atirar(self):
         j = self.jogador
         d = j.direcao
 
+        # Fase 2: Rifle de Plasma (som original mantido)
         if self.numero == 2:
-            # JogadorPlasma.atacar() devolve True/False; o projétil é criado aqui
             if not j.atacar():
                 return
-            self.sons.tocar("plasma")
+            self._som("plasma")
             self._assustar_corvos(j.rect.centerx, raio=340)
             boca_x = j.rect.centerx + d * 34
             boca_y = j.rect.y + 31
@@ -421,23 +598,34 @@ class Fase(Cena):
                 self.particulas.append(ParticulaPlasma(boca_x, boca_y))
             return
 
-        # Jogador.atacar() devolve uma lista de Tiro12 (modo guerreira) ou [] (golpe corpo a corpo)
+        # Fase 1 (Espingarda) e Fase 3 (Besta de 3 tiros)
         novos_tiros = j.atacar()
         if novos_tiros:
             self.projeteis.extend(novos_tiros)
-            self._tremer_camera(0.11, 5)
             boca_x = j.rect.centerx + 30 * d
             boca_y = j.rect.centery + 3
-            self._emitir_particulas(
-                boca_x, boca_y, 7, (175, 180, 175),
-                vel_x=(30 * d, 140 * d) if d > 0 else (140 * d, 30 * d),
-                vel_y=(-45, 25), raio=4, vida=0.45, grav=-25.0
-            )
-            self.particulas.append(Particula(
-                j.rect.centerx, boca_y - 2,
-                -d * random.uniform(55, 95), random.uniform(-170, -120),
-                config.DOURADO, vida=0.65, gravidade=480.0, eh_cartucho=True
-            ))
+
+            if j.modo_arma == "espingarda":
+                self._som("espingarda")
+                self._tremer_camera(0.11, 5)
+                self._emitir_particulas(
+                    boca_x, boca_y, 7, (175, 180, 175),
+                    vel_x=(30 * d, 140 * d) if d > 0 else (140 * d, 30 * d),
+                    vel_y=(-45, 25), raio=4, vida=0.45, grav=-25.0
+                )
+                self.particulas.append(Particula(
+                    j.rect.centerx, boca_y - 2,
+                    -d * random.uniform(55, 95), random.uniform(-170, -120),
+                    config.DOURADO, vida=0.65, gravidade=480.0, eh_cartucho=True
+                ))
+            else:
+                self._som("besta")
+                self._tremer_camera(0.06, 2)
+                self._emitir_particulas(
+                    boca_x, boca_y, 4, (220, 235, 245),
+                    vel_x=(40 * d, 120 * d) if d > 0 else (120 * d, 40 * d),
+                    vel_y=(-35, 35), raio=2, vida=0.22, grav=0.0
+                )
 
     def _assustar_corvos(self, origem_x, raio=190):
         for corvo in self.corvos:
@@ -449,7 +637,6 @@ class Fase(Cena):
 
     # ---------- horda da Fase 3 ----------
     def _encontrar_ponto_spawn_zumbi(self):
-        """Encontra um trecho seguro de terra firme perto da guerreira para um zumbi emergir."""
         t = config.TAMANHO_TILE
         jx = self.jogador.rect.centerx
         jy = self.jogador.rect.centery
@@ -560,7 +747,6 @@ class Fase(Cena):
             else:
                 inimigo.atualizar(dt, self.solidos, self.jogador)
 
-            # Chefe da Fase 3 (ondas sombrias e tremor)
             ondas = getattr(inimigo, "ondas_pendentes", None)
             if ondas:
                 self.ondas_sombrias.extend(ondas)
@@ -590,13 +776,11 @@ class Fase(Cena):
     def atualizar(self, dt):
         self.t += dt
 
-        # Hitstop (micro-congelamento dramático no impacto)
         if self.hitstop > 0:
             self.hitstop = max(0.0, self.hitstop - dt)
             self.camera.seguir(self.jogador.rect, dt)
             return
 
-        # Clima de relâmpagos e corvos na Fase 2 (apenas visual)
         if self.numero == 2:
             self.flash_relampago = max(0.0, self.flash_relampago - dt * 5.5)
             self.proximo_relampago -= dt
@@ -609,15 +793,16 @@ class Fase(Cena):
                 if corvo["voando"]:
                     corvo["x"] += corvo["vx"] * dt
                     corvo["y"] += corvo["vy"] * dt
-                    corvo["vy"] -= 25 * dt  # ganha altitude suave
+                    corvo["vy"] -= 25 * dt
 
         self.tempo_tiro_triplo = max(0.0, self.tempo_tiro_triplo - dt)
 
-        # Uma única atualização do jogador por frame
         self.jogador.atualizar(dt, self.solidos, self.largura, self._trepaveis())
 
         if self.jogador.no_chao:
             self.combo_dash = 0
+        if not self.jogador.avancando:
+            self.dash_acertados.clear()
 
         chefe_estava_vivo = bool(self.chefe and self.chefe.vivo)
 
@@ -646,6 +831,14 @@ class Fase(Cena):
 
         for part in self.particulas:
             part.atualizar(dt)
+
+        for orgao in self.pedacos_orgaos:
+            orgao.atualizar(dt, self.solidos, self.particulas)
+        self.pedacos_orgaos = [o for o in self.pedacos_orgaos if o.vida > 0]
+
+        for gosma in self.gosmas_derretidas:
+            gosma.atualizar(dt, self.particulas)
+        self.gosmas_derretidas = [g for g in self.gosmas_derretidas if g.ativo]
 
         for tf in self.textos_flutuantes:
             tf[1] -= 38 * dt
@@ -677,11 +870,12 @@ class Fase(Cena):
         self.orbes_cura = [o for o in self.orbes_cura if not o.coletado]
         self.inimigos = [i for i in self.inimigos if i.vivo]
 
-        # Feedback dramático quando o Monstro Pálido é derrotado
-        if chefe_estava_vivo and self.chefe and not self.chefe.vivo:
+        # Morte do chefe da Fase 2: explode jogando órgãos para os lados
+        if chefe_estava_vivo and self.numero == 2 and self.chefe and not self.chefe.vivo:
             self.hitstop = 0.08
             self._tremer(13, 0.45)
             self._som("hitkill_fantasma")
+            self._explodir_orgaos_chefe(self.chefe)
             self.mensagem = ("Monstro Pálido Derrotado!", "Entre no Portal Dimensional Vermelho para avançar!")
             self.tempo_mensagem = 4.5
 
@@ -701,18 +895,14 @@ class Fase(Cena):
             self.jogo.trocar_cena(GameOver(self.jogo, self.numero))
 
     def _ao_derrotar_inimigo(self, inimigo):
-        """Efeitos de morte para as fases com Jogador (1 e 3). A Fase 2 tem feedback próprio."""
         if self.numero == 2:
             return
         eh_chefe = getattr(inimigo, "eh_chefe", False)
-        qtd_particulas = 42 if eh_chefe else 14
-        cor_explosao = (126, 162, 52) if eh_chefe else (130, 22, 30)
-        self._emitir_particulas(
-            inimigo.rect.centerx, inimigo.rect.centery, qtd_particulas, cor_explosao,
-            vel_x=(-230, 230), vel_y=(-270, -40), raio=6 if eh_chefe else 4, vida=0.75 if eh_chefe else 0.5
-        )
         if eh_chefe:
+            # Chefe da Fase 3 derrete como uma gosma
+            self._derreter_chefe_gosma(inimigo)
             self._tremer_camera(0.48, 10)
+            self._som("hitkill_fantasma")
             self.ondas_sombrias.clear()
             self.fila_spawns.clear()
             self.mensagem = (
@@ -725,29 +915,24 @@ class Fase(Cena):
                     self.saida.rect.centerx, self.saida.rect.centery, 26, config.DOURADO,
                     vel_x=(-160, 160), vel_y=(-200, 60), raio=4, vida=0.65, grav=60.0
                 )
-        elif self.numero == 3:
-            self.zumbis_derrotados += 1
-            if self.zumbis_nascidos_extra < self.max_zumbis_extra:
-                self.fila_spawns.append(random.uniform(1.1, 2.0))
-                if self.zumbis_derrotados % 2 == 0:
-                    self.fila_spawns.append(random.uniform(2.1, 3.3))
+        else:
+            self._emitir_particulas(
+                inimigo.rect.centerx, inimigo.rect.centery, 14, (130, 22, 30),
+                vel_x=(-230, 230), vel_y=(-270, -40), raio=4, vida=0.5
+            )
+            if self.numero == 3:
+                self.zumbis_derrotados += 1
+                if self.zumbis_nascidos_extra < self.max_zumbis_extra:
+                    self.fila_spawns.append(random.uniform(1.1, 2.0))
+                    if self.zumbis_derrotados % 2 == 0:
+                        self.fila_spawns.append(random.uniform(2.1, 3.3))
 
         eh_anciao = isinstance(inimigo, ZumbiAnciao)
         if self.numero == 3 and (eh_chefe or eh_anciao or random.random() < 0.16):
             self.orbes_cura.append(OrbeChama(inimigo.rect.centerx, inimigo.rect.centery))
 
     def _combate(self):
-        # Golpe corpo a corpo (Fase 1; nas fases 2 e 3 hitbox_ataque é None)
-        area = self.jogador.hitbox_ataque
-        if area:
-            for inimigo in self.inimigos:
-                if inimigo.vivo and id(inimigo) not in self.jogador.alvos_acertados and area.colliderect(inimigo.rect):
-                    inimigo.receber_dano(config.DANO_ATAQUE, self.jogador.rect.centerx)
-                    self.jogador.alvos_acertados.add(id(inimigo))
-                    if not inimigo.vivo:
-                        self._ao_derrotar_inimigo(inimigo)
-
-        # Projéteis: plasma (Fase 2) e chumbinho calibre 12 (Fase 3)
+        # Projéteis: espingarda (Fase 1), plasma (Fase 2) e besta de 3 virotes (Fase 3)
         for proj in self.projeteis:
             if not proj.ativo:
                 continue
@@ -777,61 +962,72 @@ class Fase(Cena):
         for onda in self.ondas_sombrias:
             if onda.ativo and self.jogador.rect.colliderect(onda.rect):
                 if self.jogador.receber_dano(1, onda.rect.centerx):
+                    self._som("dano")
                     self._tremer_camera(0.18, 7)
                 onda.ativo = False
 
-        # Galhos com espinhos no chão (G)
         for esp in self.espinhos:
             if self.jogador.rect.colliderect(esp.rect):
                 if self.jogador.receber_dano(1, esp.rect.centerx):
+                    self._som("dano")
                     self._tremer_camera(0.14, 5)
 
-        # Vinhas espinhosas suspensas (V)
         for vinha in self.vinhas:
             if self.jogador.rect.colliderect(vinha.rect):
                 if self.jogador.receber_dano(1, vinha.rect.centerx):
+                    self._som("dano")
                     self._tremer_camera(0.14, 5)
 
-        # Armadilhas de caçador (M)
         for arm in self.armadilhas:
             if arm.fechada:
                 continue
             if self.jogador.rect.colliderect(arm.rect):
                 if self.jogador.receber_dano(1, arm.rect.centerx):
                     arm.acionar()
+                    self._som("dano")
                     self._tremer_camera(0.16, 6)
                     self._emitir_particulas(arm.rect.centerx, arm.rect.top, 6, (210, 195, 160), raio=2, vida=0.25)
 
-        # Contato com inimigos. Na Fase 2 o Dash mata Fantasmas com HITKILL e reseta a recarga.
+        # Dash Hitkill padronizado em TODAS as fases contra monstros comuns
         for inimigo in self.inimigos:
             if not inimigo.vivo:
                 continue
 
-            if self.numero == 2 and self.jogador.avancando and isinstance(inimigo, Fantasma):
+            if self.jogador.avancando:
                 zona_dash = self.jogador.rect.inflate(26, 14)
                 if zona_dash.colliderect(inimigo.rect):
-                    inimigo.vivo = False
-                    self.jogador.recarga_avanco = 0.0
-                    self.jogador.pulos_restantes = self.jogador.pulos_maximos
-                    self.combo_dash += 1
-                    self.hitstop = 0.045
-                    self._tremer(7, 0.16)
-                    self.sons.tocar("hitkill_fantasma")
+                    eh_chefe = isinstance(inimigo, (MonstroPalido, GuardiaoFloresta)) or getattr(inimigo, "eh_chefe", False)
+                    if not eh_chefe:
+                        inimigo.vivo = False
+                        self.jogador.recarga_avanco = 0.0
+                        self.jogador.pulos_restantes = self.jogador.pulos_maximos
+                        self.combo_dash += 1
+                        self.hitstop = 0.045
+                        self._tremer(7, 0.16)
+                        self._som("hitkill_fantasma")
+                        self._ao_derrotar_inimigo(inimigo)
 
-                    label = f"HITKILL {self.combo_dash}x!" if self.combo_dash > 1 else "HITKILL!"
-                    self.textos_flutuantes.append([
-                        inimigo.rect.centerx, inimigo.rect.top - 10, label, 0.9, (120, 255, 255)
-                    ])
-                    for _ in range(24):
-                        self.particulas.append(
-                            ParticulaPlasma(inimigo.rect.centerx, inimigo.rect.centery, (130, 255, 255))
-                        )
-                    continue
+                        label = f"HITKILL {self.combo_dash}x!" if self.combo_dash > 1 else "HITKILL!"
+                        self.textos_flutuantes.append([
+                            inimigo.rect.centerx, inimigo.rect.top - 10, label, 0.9, (120, 255, 255)
+                        ])
+                        for _ in range(20):
+                            self.particulas.append(
+                                ParticulaPlasma(inimigo.rect.centerx, inimigo.rect.centery, (130, 255, 255))
+                            )
+                        continue
+                    elif id(inimigo) not in self.dash_acertados:
+                        self.dash_acertados.add(id(inimigo))
+                        inimigo.receber_dano(2, self.jogador.rect.centerx)
+                        self._tremer(6, 0.14)
+                        if not inimigo.vivo:
+                            self._ao_derrotar_inimigo(inimigo)
+                        continue
 
             if self.jogador.rect.colliderect(inimigo.rect):
                 if self.jogador.receber_dano(inimigo.dano, inimigo.rect.centerx):
+                    self._som("dano")
                     if self.numero == 2:
-                        self.sons.tocar("dano")
                         self._tremer(9, 0.22)
                     else:
                         self._tremer_camera(0.16, 6)
@@ -842,6 +1038,7 @@ class Fase(Cena):
                 reliquia.coletada = True
                 self.jogador.desbloquear(reliquia.tipo)
                 self.jogo.habilidades.add(reliquia.tipo)
+                self._som("powerup")
                 self.mensagem = reliquia.textos
                 self.tempo_mensagem = 5.0
         self.reliquias = [r for r in self.reliquias if not r.coletada]
@@ -849,6 +1046,7 @@ class Fase(Cena):
         for orbe in self.orbes_cura:
             if not orbe.coletado and self.jogador.rect.colliderect(orbe.rect):
                 orbe.coletado = True
+                self._som("powerup")
                 if self.jogador.vida < self.jogador.vida_max:
                     self.jogador.vida += 1
                 self._emitir_particulas(
@@ -895,7 +1093,6 @@ class Fase(Cena):
                         self.mensagem = ("Parede rachada...", "Falta uma relíquia para quebrá-la")
                     self.tempo_mensagem = 4.0
 
-        # Portal dimensional na saída (selado enquanto houver chefe vivo)
         if self.saida and self.jogador.rect.colliderect(self.saida.rect):
             if self._chefe_ativo() is not None:
                 if self.aviso_portal_cooldown <= 0:
@@ -912,7 +1109,6 @@ class Fase(Cena):
                 self._proxima_fase()
 
     def _proxima_fase(self):
-        # Evita trocar de cena duas vezes no mesmo frame (2 -> 3 automaticamente)
         if self._trocando:
             return
         self._trocando = True
@@ -1103,7 +1299,6 @@ class Fase(Cena):
                 pygame.draw.circle(tela, (255, 55, 45), (sx + 2, sy - 1), 1)
 
     def _desenhar_olhos_fundo(self, tela):
-        """Desenha pares de olhos vermelhos piscando na escuridão entre as árvores."""
         t = pygame.time.get_ticks() * 0.001
         for olho in self.olhos_fundo:
             sx = round(olho["x"] - self.camera.x * olho["parallax"])
@@ -1138,7 +1333,6 @@ class Fase(Cena):
                     pygame.draw.circle(tela, (205, 245, 165), (sx, sy), 1)
 
     def _desenhar_selo_portal(self, tela):
-        """Desenha correntes sombrias sobre o portal enquanto o chefe da Fase 3 estiver vivo."""
         if self.numero == 2 or not self.saida or self._chefe_ativo() is None:
             return
         r = self.camera.aplicar(self.saida.rect)
@@ -1153,176 +1347,36 @@ class Fase(Cena):
         pygame.draw.circle(tela, (255, 65, 65), r.center, 8)
         pygame.draw.circle(tela, (40, 8, 12), r.center, 4)
 
-    def _desenhar_iluminacao(self, tela):
-        progresso = min(1.0, max(0.0, self.jogador.rect.centerx / max(1, self.largura)))
-        alpha_trevas = int(230 + progresso * 15)
-
-        escuridao = pygame.Surface((config.LARGURA, config.ALTURA), pygame.SRCALPHA)
-        escuridao.fill((1, 2, 3, alpha_trevas))
-
-        def abrir_luz(centro_tela, raio, intensidade_max=alpha_trevas):
-            for passo in range(6, 0, -1):
-                r = int(raio * (passo / 6))
-                alpha = int(intensidade_max * (1 - (passo - 1) / 6))
-                pygame.draw.circle(escuridao, (0, 0, 0, alpha), centro_tela, r)
-
-        abrir_luz(self._posicao_lua(), 145, int(alpha_trevas * 0.72))
-
-        for tocha in self.tochas:
-            pos_tela = self.camera.aplicar(tocha.rect).center
-            if -250 <= pos_tela[0] <= config.LARGURA + 250:
-                abrir_luz(pos_tela, int(tocha.raio_luz() * 0.88), alpha_trevas)
-
-        for orbe in self.orbes_cura:
-            pos_orbe = self.camera.aplicar(orbe.rect).center
-            if -120 <= pos_orbe[0] <= config.LARGURA + 120:
-                abrir_luz(pos_orbe, 72, int(alpha_trevas * 0.85))
-
-        pos_jog = self.camera.aplicar(self.jogador.rect).center
-        raio_base = int(94 - progresso * 16)
-        raio_jog = 185 if self.jogador.atacando else raio_base
-        abrir_luz(pos_jog, raio_jog, int(alpha_trevas * 0.92))
-
-        if self.saida:
-            pos_saida = self.camera.aplicar(self.saida.rect).center
-            if -200 <= pos_saida[0] <= config.LARGURA + 200:
-                abrir_luz(pos_saida, 125, int(alpha_trevas * 0.82))
-
-        tela.blit(escuridao, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
-
-        nevoa1 = pygame.Surface((config.LARGURA, 115), pygame.SRCALPHA)
-        nevoa1.fill((12, 20, 19, 52))
-        tela.blit(nevoa1, (0, config.ALTURA - 175))
-
-        nevoa2 = pygame.Surface((config.LARGURA, 65), pygame.SRCALPHA)
-        nevoa2.fill((16, 26, 24, 44))
-        tela.blit(nevoa2, (0, config.ALTURA - 115))
-
-        self._desenhar_olhos_fundo(tela)
-        self._desenhar_morcegos(tela, apenas_distantes=False)
-        self._desenhar_vagalumes(tela)
-
-        for inimigo in self.inimigos:
-            if hasattr(inimigo, "desenhar_olhos_brilhantes"):
-                inimigo.desenhar_olhos_brilhantes(tela, self.camera)
-
     def _desenhar_barra_chefe(self, tela):
-        if self.numero == 2:
-            # Barra do Monstro Pálido (Fase 2)
-            if self.chefe and self.chefe.vivo and abs(self.jogador.rect.centerx - self.chefe.rect.centerx) < 750:
-                larg_barra = 420
-                bx = config.LARGURA // 2 - larg_barra // 2
-                by = 48
-                nome = self.fonte.render("MONSTRO PÁLIDO - SENHOR DO CEMITÉRIO", True, (235, 225, 240))
-                tela.blit(nome, nome.get_rect(center=(config.LARGURA // 2, by - 14)))
-                pygame.draw.rect(tela, (25, 15, 25), (bx - 2, by - 2, larg_barra + 4, 16), border_radius=4)
-                atual = int(larg_barra * max(0, self.chefe.vida) / self.chefe.vida_max)
-                pygame.draw.rect(tela, (190, 35, 65), (bx, by, atual, 12), border_radius=3)
-            return
-
+        """Barra de vida padronizada entre o chefe da Fase 2 e o chefe da Fase 3."""
         chefe = self._chefe_ativo()
         if chefe is None:
             return
-        if abs(chefe.rect.centerx - self.jogador.rect.centerx) > 760:
+        if abs(self.jogador.rect.centerx - chefe.rect.centerx) >= 750:
             return
 
-        larg = 440
-        alt = 16
-        bx = (config.LARGURA - larg) // 2
-        by = config.ALTURA - 42
+        larg_barra = 420
+        alt_barra = 16
+        bx = config.LARGURA // 2 - larg_barra // 2
+        by = 48
 
-        titulo = self.fonte.render(chefe.nome, True, (235, 85, 85))
-        sombra = self.fonte.render(chefe.nome, True, (0, 0, 0))
-        tpos = titulo.get_rect(center=(config.LARGURA // 2, by - 14))
-        tela.blit(sombra, tpos.move(2, 2))
-        tela.blit(titulo, tpos)
+        if self.numero == 2:
+            titulo_txt = "MONSTRO PÁLIDO - SENHOR DO CEMITÉRIO"
+        else:
+            nome_chefe = getattr(chefe, "nome", "ABOMINAÇÃO DERRETIDA").upper()
+            titulo_txt = f"{nome_chefe} - SENHOR DA FLORESTA"
 
-        pygame.draw.rect(tela, (18, 12, 16), (bx - 3, by - 3, larg + 6, alt + 6), border_radius=5)
-        pygame.draw.rect(tela, (120, 30, 35), (bx - 3, by - 3, larg + 6, alt + 6), 2, border_radius=5)
-        proporcao = max(0.0, chefe.vida / chefe.vida_max)
-        pygame.draw.rect(tela, (185, 28, 38), (bx, by, int(larg * proporcao), alt), border_radius=3)
+        nome = self.fonte.render(titulo_txt, True, (235, 225, 240))
+        sombra = self.fonte.render(titulo_txt, True, (0, 0, 0))
+        pos_nome = nome.get_rect(center=(config.LARGURA // 2, by - 14))
+        tela.blit(sombra, pos_nome.move(2, 2))
+        tela.blit(nome, pos_nome)
+
+        pygame.draw.rect(tela, (25, 15, 25), (bx - 2, by - 2, larg_barra + 4, alt_barra), border_radius=4)
+        atual = int(larg_barra * max(0, chefe.vida) / chefe.vida_max)
+        pygame.draw.rect(tela, (190, 35, 65), (bx, by, atual, alt_barra - 4), border_radius=3)
 
     # ---------- desenho: Fase 2 (cemitério) ----------
-    def _desenhar_fundo_cemiterio(self, tela):
-        ox = getattr(self.camera, "offset_x", 0)
-        oy = getattr(self.camera, "offset_y", 0)
-
-        clarao = int(self.flash_relampago * 85)
-        for y in range(0, config.ALTURA, 6):
-            fator = y / config.ALTURA
-            r = min(255, int(8 + 14 * fator) + clarao)
-            g = min(255, int(12 + 20 * fator) + clarao)
-            b = min(255, int(24 + 26 * fator) + int(clarao * 1.3))
-            pygame.draw.rect(tela, (r, g, b), (0, y, config.LARGURA, 6))
-
-        lua_x = int(760 - self.camera.x * 0.06) + ox
-        lua_y = 115 + oy
-        halo_lua = pygame.Surface((260, 260), pygame.SRCALPHA)
-        pygame.draw.circle(halo_lua, (180, 200, 230, 18), (130, 130), 125)
-        pygame.draw.circle(halo_lua, (210, 225, 245, 32), (130, 130), 85)
-        tela.blit(halo_lua, (lua_x - 130, lua_y - 130))
-        pygame.draw.circle(tela, (238, 240, 228), (lua_x, lua_y), 48)
-        pygame.draw.circle(tela, (205, 208, 198), (lua_x - 14, lua_y - 10), 11)
-        pygame.draw.circle(tela, (215, 218, 208), (lua_x + 12, lua_y + 14), 8)
-
-        for i in range(-1, 6):
-            cx = int(i * 340 - (self.camera.x * 0.18) % 340) + ox
-            pts = [(cx - 80, config.ALTURA), (cx + 90, 270), (cx + 260, 320), (cx + 420, config.ALTURA)]
-            pygame.draw.polygon(tela, (15, 20, 32), pts)
-
-        chao_y = self.altura - (2 * config.TAMANHO_TILE)
-        for wx in range(120, self.largura - 100, 280):
-            sx = int(wx - self.camera.x) + ox
-            sy = int(chao_y - self.camera.y) + oy
-            if -180 <= sx <= config.LARGURA + 180:
-                pygame.draw.line(tela, (26, 30, 42), (sx - 60, sy - 58), (sx + 160, sy - 58), 3)
-                pygame.draw.line(tela, (26, 30, 42), (sx - 60, sy - 16), (sx + 160, sy - 16), 3)
-                for gx in range(sx - 50, sx + 160, 22):
-                    pygame.draw.line(tela, (30, 35, 48), (gx, sy - 68), (gx, sy), 2)
-                    pygame.draw.polygon(tela, (40, 46, 62), [(gx - 3, sy - 68), (gx, sy - 76), (gx + 3, sy - 68)])
-
-                tronco_x = sx + 125
-                pygame.draw.lines(tela, (18, 21, 30), False, [
-                    (tronco_x, sy), (tronco_x - 6, sy - 65), (tronco_x + 8, sy - 125), (tronco_x - 14, sy - 175)
-                ], 7)
-                pygame.draw.lines(tela, (18, 21, 30), False, [
-                    (tronco_x - 3, sy - 85), (tronco_x - 42, sy - 120), (tronco_x - 62, sy - 145)
-                ], 4)
-                pygame.draw.lines(tela, (18, 21, 30), False, [
-                    (tronco_x + 4, sy - 105), (tronco_x + 45, sy - 140), (tronco_x + 68, sy - 155)
-                ], 4)
-
-                pygame.draw.rect(tela, (48, 54, 68), (sx - 4, sy - 8, 38, 8))
-                pygame.draw.rect(tela, (62, 68, 84), (sx, sy - 44, 30, 36), border_top_left_radius=14, border_top_right_radius=14)
-                pygame.draw.line(tela, (35, 40, 50), (sx + 8, sy - 34), (sx + 16, sy - 22), 2)
-
-                pygame.draw.rect(tela, (52, 58, 74), (sx + 68, sy - 58, 8, 58))
-                pygame.draw.rect(tela, (52, 58, 74), (sx + 55, sy - 42, 34, 8))
-
-                chama = int(math.sin(self.t * 12 + wx) * 2)
-                pygame.draw.rect(tela, (215, 205, 185), (sx + 38, sy - 10, 5, 10))
-                luz_vela = pygame.Surface((46, 46), pygame.SRCALPHA)
-                pygame.draw.circle(luz_vela, (255, 180, 70, 45), (23, 23), 20 + chama)
-                tela.blit(luz_vela, (sx + 17, sy - 34))
-                pygame.draw.circle(tela, (255, 220, 110), (sx + 40, sy - 13), 3)
-
-        # Corvos (pousados nas lápides/cruzes ou batendo asas no céu)
-        for corvo in self.corvos:
-            cx = int(corvo["x"] - self.camera.x) + ox
-            cy = int(corvo["y"] - self.camera.y) + oy
-            if -60 <= cx <= config.LARGURA + 60 and -60 <= cy <= config.ALTURA + 60:
-                if corvo["voando"]:
-                    asa = int(math.sin(self.t * 22 + corvo["fase"]) * 8)
-                    pygame.draw.lines(tela, (12, 14, 20), False, [
-                        (cx - 12, cy - asa), (cx - 4, cy), (cx, cy - 2), (cx + 4, cy), (cx + 12, cy - asa)
-                    ], 3)
-                    pygame.draw.circle(tela, (220, 45, 65), (cx + (3 if corvo["vx"] >= 0 else -3), cy - 2), 1)
-                else:
-                    pygame.draw.ellipse(tela, (14, 16, 22), (cx - 6, cy - 10, 12, 10))
-                    pygame.draw.circle(tela, (14, 16, 22), (cx + 3, cy - 12), 4)
-                    pygame.draw.polygon(tela, (70, 75, 85), [(cx + 6, cy - 13), (cx + 11, cy - 12), (cx + 6, cy - 10)])
-                    pygame.draw.circle(tela, (220, 50, 70), (cx + 4, cy - 13), 1)
-
     def _desenhar_plataformas_cemiterio(self, tela):
         for p in self.plataformas:
             r = self.camera.aplicar(p.rect)
@@ -1333,22 +1387,6 @@ class Fase(Cena):
                 pygame.draw.rect(tela, (28, 33, 44), (bx, r.y + 4, 30, r.height - 4), 1)
             pygame.draw.rect(tela, (48, 68, 62), (r.x, r.y, r.width, 6))
             pygame.draw.line(tela, (75, 102, 92), (r.x, r.y), (r.right, r.y), 2)
-
-    def _desenhar_atmosfera_frente(self, tela):
-        ox = getattr(self.camera, "offset_x", 0)
-        oy = getattr(self.camera, "offset_y", 0)
-
-        desloc = int((self.t * 28) % 240)
-        nevoa = pygame.Surface((config.LARGURA + 240, 95), pygame.SRCALPHA)
-        for nx in range(0, config.LARGURA + 240, 120):
-            pygame.draw.ellipse(nevoa, (130, 155, 175, 26), (nx - 40, 18, 220, 75))
-        tela.blit(nevoa, (-desloc + ox, config.ALTURA - 85 + oy))
-
-        for esp in self.esporos:
-            ex = int((esp[0] + math.sin(self.t * esp[2] + esp[3]) * 18) - self.camera.x) + ox
-            ey = int((esp[1] + math.cos(self.t * esp[2] * 0.8 + esp[3]) * 12) - self.camera.y) + oy
-            if 0 <= ex <= config.LARGURA and 0 <= ey <= config.ALTURA:
-                pygame.draw.circle(tela, (150, 230, 235), (ex, ey), 2)
 
     # ---------- desenho: cena ----------
     def _desenhar_efeitos_fase1(self, tela):
@@ -1452,14 +1490,12 @@ class Fase(Cena):
         for r in self.reliquias:
             r.desenhar(tela, self.camera)
 
-        # Orbes de cura (H)
         for cura in self.curas:
             rc = self.camera.aplicar(cura)
             pulso = int(math.sin(self.t * 6) * 3)
             pygame.draw.circle(tela, (60, 235, 140), rc.center, 10 + pulso)
             pygame.draw.circle(tela, (220, 255, 235), rc.center, 5)
 
-        # Cristais de Tiro Triplo (T)
         for pw in self.powerups:
             rp = self.camera.aplicar(pw)
             flutuar = int(math.sin(self.t * 5) * 4)
@@ -1470,6 +1506,10 @@ class Fase(Cena):
 
         for orbe in self.orbes_cura:
             orbe.desenhar(tela, self.camera)
+
+        for gosma in self.gosmas_derretidas:
+            gosma.desenhar(tela, self.camera)
+
         for inimigo in self.inimigos:
             if self.numero == 1:
                 self._desenhar_inimigo_fase1(tela, inimigo)
@@ -1484,17 +1524,17 @@ class Fase(Cena):
             proj.desenhar(tela, self.camera)
         for orbe in self.orbes_inimigos:
             orbe.desenhar(tela, self.camera)
+        for orgao in self.pedacos_orgaos:
+            orgao.desenhar(tela, self.camera)
         for part in self.particulas:
             part.desenhar(tela, self.camera)
 
-        # Textos flutuantes de HITKILL / Combo
         for tf in self.textos_flutuantes:
             pos = self.camera.aplicar(pygame.Rect(round(tf[0]), round(tf[1]), 1, 1)).topleft
             img = self.fonte_combo.render(tf[2], True, tf[4])
             tela.blit(img, img.get_rect(center=pos))
 
     def desenhar(self, tela):
-        # Tremor de tela da Fase (a câmera é restaurada ao fim do desenho do mundo)
         cam_orig = (self.camera.x, self.camera.y)
         if self.shake_tempo > 0 and self.shake_forca > 0:
             self.camera.x += random.randint(-self.shake_forca, self.shake_forca)
@@ -1504,7 +1544,6 @@ class Fase(Cena):
         finally:
             self.camera.x, self.camera.y = cam_orig
 
-        # ---------- interface (sem tremor) ----------
         self.hud.desenhar(tela, self.jogador, self.numero)
         self._desenhar_barra_chefe(tela)
 
@@ -1515,9 +1554,9 @@ class Fase(Cena):
         if self.numero == 2:
             ajuda = f"Fase {self.numero} | A-D: andar | W/S: escada | ESPAÇO: pular | K/SHIFT: dash hitkill | J/X: plasma"
         elif self.numero == 3:
-            ajuda = f"Fase {self.numero} | A-D: andar | W/S: escalar | ESPAÇO: pular | J/X: atirar | ESC: menu"
+            ajuda = f"Fase {self.numero} | A-D: andar | W/S: escalar | ESPAÇO: pular | K/SHIFT: dash hitkill | J/X: besta (3 tiros)"
         else:
-            ajuda = f"Fase {self.numero} | A-D: andar | ESPAÇO: pular | J/X: atacar | ESC: menu"
+            ajuda = f"Fase {self.numero} | A-D: andar | ESPAÇO: pular | K/SHIFT: dash hitkill | J/X: calibre 12"
         self.hud.desenhar_comandos(tela, ajuda)
 
         if self.mensagem and self.tempo_mensagem > 0:
