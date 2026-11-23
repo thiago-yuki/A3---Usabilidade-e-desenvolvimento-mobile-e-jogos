@@ -1112,7 +1112,10 @@ class Fase(Cena):
         if self._trocando:
             return
         self._trocando = True
-        if existe_fase(self.numero + 1):
+        if self.numero == 3:
+            from cenas.batalha_final import BatalhaFinal
+            self.jogo.trocar_cena(BatalhaFinal(self.jogo))
+        elif existe_fase(self.numero + 1):
             self.jogo.trocar_cena(Fase(self.jogo, self.numero + 1))
         else:
             from cenas.final import Final

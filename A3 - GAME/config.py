@@ -35,6 +35,13 @@ RECUO_X = 260             # empurrão ao levar dano
 RECUO_Y = 300
 RECUO_INIMIGO = 180
 
+# Batalha final
+BATALHA_VIDA_HEROI = 6
+BATALHA_RECARGA_GOSMA = 0.45
+BATALHA_VIDA_BARRA_DRAGAO = 3
+BATALHA_DANO_ESPADA = 1
+BATALHA_DANO_GOSMA = 1
+
 # Habilidades
 AVANCO_VELOCIDADE = 720   # px/s durante o avanço
 AVANCO_DURACAO = 0.25     # s (≈ 180 px de distância)

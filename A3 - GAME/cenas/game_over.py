@@ -45,15 +45,23 @@ def _escala(cor, f):
     return tuple(int(_clamp(c * f, 0, 255)) for c in cor)
 
 
-def _cor_fogo(t):
+def _cor_fogo(t, vitoria=False):
     """t: 0 (nasceu) -> 1 (morreu). Branco-amarelo -> laranja -> vermelho -> escuro."""
     t = _clamp(t)
-    pontos = [
-        (0.00, (255, 245, 190)),
-        (0.25, (255, 170, 60)),
-        (0.60, (205, 65, 22)),
-        (1.00, (40, 10, 8)),
-    ]
+    if vitoria:
+        pontos = [
+            (0.00, (220, 255, 190)),
+            (0.25, (125, 245, 100)),
+            (0.60, (45, 165, 65)),
+            (1.00, (8, 35, 18)),
+        ]
+    else:
+        pontos = [
+            (0.00, (255, 245, 190)),
+            (0.25, (255, 170, 60)),
+            (0.60, (205, 65, 22)),
+            (1.00, (40, 10, 8)),
+        ]
     for (t0, c0), (t1, c1) in zip(pontos, pontos[1:]):
         if t <= t1:
             return _mix(c0, c1, (t - t0) / (t1 - t0))
@@ -70,9 +78,12 @@ MULT = pygame.BLEND_RGB_MULT
 class GameOver(Cena):
     OPCOES = [("Tentar novamente", "ENTER"), ("Voltar ao menu", "ESC")]
 
-    def __init__(self, jogo, numero):
+    def __init__(self, jogo, numero, vitoria=False):
         super().__init__(jogo)
         self.numero = numero
+        self.vitoria = vitoria
+        if self.vitoria:
+            self.OPCOES = [("Voltar ao menu", "ENTER")]
 
         self.L = config.LARGURA
         self.A = config.ALTURA
@@ -92,9 +103,9 @@ class GameOver(Cena):
         self.cache_suave = {}
 
         # Cores
-        self.dourado = (255, 196, 104)
-        self.cinza = (150, 140, 136)
-        self.branco = (238, 231, 222)
+        self.dourado = (157, 238, 153) if self.vitoria else (255, 196, 104)
+        self.cinza = (145, 169, 148) if self.vitoria else (150, 140, 136)
+        self.branco = (232, 245, 229) if self.vitoria else (238, 231, 222)
 
         self._criar_fontes()
         self._criar_layout()
@@ -148,26 +159,39 @@ class GameOver(Cena):
         self._pre_textos()
 
         self.flash = pygame.Surface((self.L, self.A))
-        self.flash.fill((255, 70, 45))
+        self.flash.fill((75, 235, 105) if self.vitoria else (255, 70, 45))
         self.preto = pygame.Surface((self.L, self.A))
         self.preto.fill((0, 0, 0))
 
-        self.paleta_fogo = [_escala(_cor_fogo(i / 23), 0.6) for i in range(24)]
+        self.paleta_fogo = [
+            _escala(_cor_fogo(i / 23, self.vitoria), 0.6) for i in range(24)
+        ]
 
     # ---- fundo -------------------------------------------------------
     def _pre_fundo(self):
         L, A = self.L, self.A
         s = pygame.Surface((L, A))
+        cor_topo = (4, 12, 8) if self.vitoria else (7, 5, 11)
+        cor_base = (24, 49, 32) if self.vitoria else (32, 13, 17)
         for y in range(A):
             t = y / A
-            pygame.draw.line(s, _mix((7, 5, 11), (32, 13, 17), t ** 1.6), (0, y), (L, y))
+            pygame.draw.line(s, _mix(cor_topo, cor_base, t ** 1.6), (0, y), (L, y))
 
         # Camadas de montanhas (fundo -> frente) com luz de contorno
-        camadas = [
-            (A - 170, 95, (24, 12, 17), 1, 40, (80, 26, 22)),
-            (A - 100, 70, (16, 8, 13), 2, 28, (60, 20, 18)),
-            (A - 45, 40, (9, 5, 8), 3, 20, None),
-        ]
+        if self.vitoria:
+            camadas = [
+                (A - 170, 95, (18, 35, 24), 1, 40, (61, 105, 57)),
+                (A - 100, 70, (12, 25, 17), 2, 28, (43, 79, 45)),
+                (A - 45, 40, (7, 15, 10), 3, 20, None),
+            ]
+            cor_luz = (35, 145, 55)
+        else:
+            camadas = [
+                (A - 170, 95, (24, 12, 17), 1, 40, (80, 26, 22)),
+                (A - 100, 70, (16, 8, 13), 2, 28, (60, 20, 18)),
+                (A - 45, 40, (9, 5, 8), 3, 20, None),
+            ]
+            cor_luz = (160, 34, 20)
         for base, amp, cor, seed, passo, rim in camadas:
             rnd = random.Random(seed)
             pts = []
@@ -181,12 +205,12 @@ class GameOver(Cena):
                 pygame.draw.lines(s, rim, False, pts, 1)
         self.fundo = s
 
-        # Luz avermelhada vinda do fogo (por baixo)
+        # Luz colorida vinda do fogo (por baixo)
         altura = int(A * 0.6)
         luz = pygame.Surface((L, A), pygame.SRCALPHA)
         for i in range(altura):
             a = int(125 * (1 - i / altura) ** 2)
-            pygame.draw.line(luz, (160, 34, 20, a), (0, A - i), (L, A - i))
+            pygame.draw.line(luz, cor_luz + (a,), (0, A - i), (L, A - i))
         self.luz_base = luz
 
     def _pre_vinheta_scanlines(self):
@@ -211,18 +235,24 @@ class GameOver(Cena):
         pw, ph = self.pw, self.ph
 
         grad = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        painel_topo = (19, 35, 24) if self.vitoria else (32, 23, 27)
+        painel_base = (11, 20, 14) if self.vitoria else (15, 11, 14)
+        painel_borda = (39, 82, 45, 255) if self.vitoria else (66, 30, 28, 255)
+        orn = (113, 181, 109, 255) if self.vitoria else (170, 105, 52, 255)
+        orn_brilho = (159, 231, 139, 255) if self.vitoria else (230, 150, 70, 255)
+        divisor = (70, 135, 75) if self.vitoria else (125, 58, 46)
+        divisor_gema = (171, 238, 152, 255) if self.vitoria else (255, 170, 80, 255)
         for y in range(ph):
-            c = _mix((32, 23, 27), (15, 11, 14), y / ph)
+            c = _mix(painel_topo, painel_base, y / ph)
             pygame.draw.line(grad, c + (226,), (0, y), (pw, y))
 
         mascara = pygame.Surface((pw, ph), pygame.SRCALPHA)
         pygame.draw.rect(mascara, (255, 255, 255, 255), (0, 0, pw, ph), border_radius=16)
         grad.blit(mascara, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
 
-        pygame.draw.rect(grad, (66, 30, 28, 255), (0, 0, pw, ph), 1, border_radius=16)
+        pygame.draw.rect(grad, painel_borda, (0, 0, pw, ph), 1, border_radius=16)
 
         # Ornamentos de canto
-        orn = (170, 105, 52, 255)
         m, c = 14, 24
         for sx in (m, pw - m):
             for sy in (m, ph - m):
@@ -230,7 +260,7 @@ class GameOver(Cena):
                 dy = 1 if sy == m else -1
                 pygame.draw.line(grad, orn, (sx, sy), (sx + dx * c, sy), 2)
                 pygame.draw.line(grad, orn, (sx, sy), (sx, sy + dy * c), 2)
-                pygame.draw.circle(grad, (230, 150, 70, 255), (sx, sy), 3)
+                pygame.draw.circle(grad, orn_brilho, (sx, sy), 3)
 
         # Divisor com losango
         yd = self.y_div - self.py
@@ -239,9 +269,9 @@ class GameOver(Cena):
             for i in range(150):
                 a = int(255 * (1 - i / 150))
                 x = cxl + lado * (14 + i)
-                grad.fill((125, 58, 46, a), (x, yd, 1, 1))
+                grad.fill(divisor + (a,), (x, yd, 1, 1))
         pygame.draw.polygon(
-            grad, (255, 170, 80, 255),
+            grad, divisor_gema,
             [(cxl, yd - 5), (cxl + 6, yd), (cxl, yd + 5), (cxl - 6, yd)]
         )
         self.painel = grad
@@ -284,7 +314,8 @@ class GameOver(Cena):
         return pygame.transform.smoothscale(peq, base.get_size()), pad
 
     def _pre_titulo(self):
-        branco = self._texto_espacado("GAME OVER", self.f_titulo, (255, 255, 255), 7)
+        texto_titulo = "FIM" if self.vitoria else "GAME OVER"
+        branco = self._texto_espacado(texto_titulo, self.f_titulo, (255, 255, 255), 7)
         w, h = branco.get_size()
         max_w = self.pw - 70
         if w > max_w:
@@ -293,41 +324,56 @@ class GameOver(Cena):
             branco = pygame.transform.smoothscale(branco, (w, h))
 
         grad = pygame.Surface((w, h), pygame.SRCALPHA)
+        topo = (205, 255, 182) if self.vitoria else (255, 150, 110)
+        base = (48, 151, 59) if self.vitoria else (165, 26, 26)
         for y in range(h):
-            c = _mix((255, 150, 110), (165, 26, 26), y / max(1, h - 1))
+            c = _mix(topo, base, y / max(1, h - 1))
             pygame.draw.line(grad, c + (255,), (0, y), (w, y))
 
         face = branco.copy()
         face.blit(grad, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
         sombra = branco.copy()
-        sombra.fill((20, 4, 4, 255), special_flags=pygame.BLEND_RGBA_MULT)
+        cor_sombra = (5, 23, 8, 255) if self.vitoria else (20, 4, 4, 255)
+        sombra.fill(cor_sombra, special_flags=pygame.BLEND_RGBA_MULT)
 
         final = pygame.Surface((w + 6, h + 6), pygame.SRCALPHA)
         final.blit(sombra, (3, 4))
         final.blit(face, (0, 0))
         self.titulo = final
 
-        self.titulo_glow, self.pad_glow = self._glow_texto(final, (255, 70, 35))
+        cor_glow = (83, 255, 103) if self.vitoria else (255, 70, 35)
+        self.titulo_glow, self.pad_glow = self._glow_texto(final, cor_glow)
 
         ciano = self._sobre_preto(final)
-        ciano.fill((0, 150, 190), special_flags=MULT)
+        cor_ciano = (43, 210, 135) if self.vitoria else (0, 150, 190)
+        ciano.fill(cor_ciano, special_flags=MULT)
         verm = self._sobre_preto(final)
-        verm.fill((190, 0, 0), special_flags=MULT)
+        cor_vermelho = (18, 105, 38) if self.vitoria else (190, 0, 0)
+        verm.fill(cor_vermelho, special_flags=MULT)
         self.titulo_ciano, self.titulo_verm = ciano, verm
 
     def _pre_textos(self):
+        if self.vitoria:
+            rotulo = "JORNADA CONCLUÍDA"
+            self.txt_sub = "A princesa foi salva"
+            frase = "Obrigado por jogar!"
+            dica = "ENTER / ESC  voltar ao menu"
+        else:
+            rotulo = f"FASE {self.numero}"
+            self.txt_sub = "Consumed by fear"
+            frase = "Sua jornada ainda não terminou."
+            dica = "SETAS / W S  navegar     ENTER  confirmar     ESC  menu"
+
         self.txt_fase = self._texto_espacado(
-            f"FASE {self.numero}", self.f_mini, (190, 120, 60), 4
+            rotulo, self.f_mini, (145, 211, 132) if self.vitoria else (190, 120, 60), 4
         )
-        self.txt_sub = "Consumed by fear"
         self.txt_sub_larg = self.f_sub.size(self.txt_sub)[0]
         self.txt_frase = self.f_detalhe.render(
-            "Sua jornada ainda não terminou.", True, (130, 117, 112)
+            frase, True, (159, 191, 157) if self.vitoria else (130, 117, 112)
         )
         self.txt_dica = self.f_mini.render(
-            "SETAS / W S  navegar     ENTER  confirmar     ESC  menu",
-            True, (92, 84, 82)
+            dica, True, (116, 161, 119) if self.vitoria else (92, 84, 82)
         )
 
         self.op_surfs = []
@@ -335,13 +381,17 @@ class GameOver(Cena):
             r = self.rects_opcoes[i]
 
             barra = pygame.Surface(r.size, pygame.SRCALPHA)
-            pygame.draw.rect(barra, (255, 130, 50, 38), barra.get_rect(), border_radius=10)
-            pygame.draw.rect(barra, (230, 110, 50, 170), barra.get_rect(), 1, border_radius=10)
+            cor_barra = (105, 225, 112, 38) if self.vitoria else (255, 130, 50, 38)
+            cor_borda = (91, 190, 94, 170) if self.vitoria else (230, 110, 50, 170)
+            pygame.draw.rect(barra, cor_barra, barra.get_rect(), border_radius=10)
+            pygame.draw.rect(barra, cor_borda, barra.get_rect(), 1, border_radius=10)
 
             badge = pygame.Surface((70, 26), pygame.SRCALPHA)
             pygame.draw.rect(badge, (255, 255, 255, 18), badge.get_rect(), border_radius=6)
-            pygame.draw.rect(badge, (170, 150, 120, 120), badge.get_rect(), 1, border_radius=6)
-            t = self.f_tecla.render(tecla, True, (205, 190, 165))
+            cor_badge = (121, 177, 119, 130) if self.vitoria else (170, 150, 120, 120)
+            cor_tecla = (199, 236, 191) if self.vitoria else (205, 190, 165)
+            pygame.draw.rect(badge, cor_badge, badge.get_rect(), 1, border_radius=6)
+            t = self.f_tecla.render(tecla, True, cor_tecla)
             badge.blit(t, t.get_rect(center=badge.get_rect().center))
 
             self.op_surfs.append({
@@ -454,7 +504,7 @@ class GameOver(Cena):
                 elif e.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     self._confirmar(self.selecionado)
                 elif e.key == pygame.K_ESCAPE:
-                    self._confirmar(1)
+                    self._confirmar(len(self.OPCOES) - 1)
 
             elif e.type == pygame.MOUSEMOTION:
                 for i, r in enumerate(self.rects_opcoes):
@@ -468,13 +518,20 @@ class GameOver(Cena):
                         self._confirmar(i)
 
     def _confirmar(self, indice):
-        self.destino = "fase" if indice == 0 else "menu"
+        if self.vitoria:
+            self.destino = "menu"
+        else:
+            self.destino = "fase" if indice == 0 else "menu"
         self.t_saida = 0.0
 
     def _executar_destino(self):
         if self.destino == "fase":
-            from cenas.fase import Fase
-            self.jogo.trocar_cena(Fase(self.jogo, self.numero))
+            if self.numero == 4:
+                from cenas.batalha_final import BatalhaFinal
+                self.jogo.trocar_cena(BatalhaFinal(self.jogo))
+            else:
+                from cenas.fase import Fase
+                self.jogo.trocar_cena(Fase(self.jogo, self.numero))
         else:
             from cenas.menu import Menu
             self.jogo.trocar_cena(Menu(self.jogo))
@@ -656,11 +713,16 @@ class GameOver(Cena):
             pulso = 0.55 + 0.45 * abs(math.sin(t * 3 + b["fase"]))
             fade = _clamp(b["y"] / (self.A * 0.35))
             f = pulso * fade
-            cor = (int(255 * f), int(110 * f + 20 * fade), int(30 * fade))
+            if self.vitoria:
+                cor = (int(75 * f), int(235 * f), int(105 * f + 18 * fade))
+                cor_glow = (35, 155, 55)
+            else:
+                cor = (int(255 * f), int(110 * f + 20 * fade), int(30 * fade))
+                cor_glow = (140, 55, 20)
             x, y = int(b["x"]), int(b["y"])
             pygame.draw.circle(buf, cor, (x, y), b["tam"])
             if b["tam"] >= 2:
-                self._blit_glow(buf, x, y, b["tam"] * 5, _escala((140, 55, 20), f))
+                self._blit_glow(buf, x, y, b["tam"] * 5, _escala(cor_glow, f))
 
     # ---- painel -------------------------------------------------------
     def _desenhar_painel(self, buf):
@@ -677,15 +739,21 @@ class GameOver(Cena):
 
         # Borda pulsante
         pulso = 0.5 + 0.5 * math.sin(t * 2)
-        cor = _mix((95, 36, 32), (190, 70, 40), pulso * _clamp(self.luz))
+        cor = _mix(
+            (35, 74, 42) if self.vitoria else (95, 36, 32),
+            (95, 191, 81) if self.vitoria else (190, 70, 40),
+            pulso * _clamp(self.luz),
+        )
         pygame.draw.rect(buf, cor, (px, py, pw, ph), 2, border_radius=16)
 
         # Linha superior com luz percorrendo
         y = py + 2
-        pygame.draw.line(buf, (120, 50, 36), (px + 50, y), (px + pw - 50, y), 2)
+        cor_linha = (57, 118, 62) if self.vitoria else (120, 50, 36)
+        cor_luz = (137, 255, 104) if self.vitoria else (255, 130, 60)
+        pygame.draw.line(buf, cor_linha, (px + 50, y), (px + pw - 50, y), 2)
         pos = math.sin(t * 0.9) * 0.5 + 0.5
         xl = px + 50 + int(pos * (pw - 100))
-        self._blit_glow(buf, xl, y, 40, (255, 130, 60))
+        self._blit_glow(buf, xl, y, 40, cor_luz)
 
     # ---- conteúdo -----------------------------------------------------
     def _desenhar_conteudo(self, buf):
@@ -736,7 +804,7 @@ class GameOver(Cena):
             raio = 30 + 80 * k
             self._blit_glow(
                 buf, cx, cy + 10, raio,
-                _escala((150, 60, 22), k * self.luz)
+                _escala((45, 145, 55) if self.vitoria else (150, 60, 22), k * self.luz)
             )
 
         # Toras
@@ -748,26 +816,41 @@ class GameOver(Cena):
         if k > 0.05:
             H = 70 * k ** 0.8
             W = 20 * (0.55 + 0.45 * k)
-            capas = [
-                (1.00, (185, 36, 30), 0.0),
-                (0.80, (238, 100, 38), 1.7),
-                (0.58, (255, 170, 66), 3.1),
-                (0.34, (255, 238, 190), 4.4),
-            ]
+            if self.vitoria:
+                capas = [
+                    (1.00, (32, 132, 51), 0.0),
+                    (0.80, (63, 194, 66), 1.7),
+                    (0.58, (132, 239, 93), 3.1),
+                    (0.34, (226, 255, 181), 4.4),
+                ]
+                cor_brasa = (128, 226, 94)
+                cor_nucleo = (212, 255, 157)
+                cor_glow = (54, 138, 46)
+            else:
+                capas = [
+                    (1.00, (185, 36, 30), 0.0),
+                    (0.80, (238, 100, 38), 1.7),
+                    (0.58, (255, 170, 66), 3.1),
+                    (0.34, (255, 238, 190), 4.4),
+                ]
+                cor_brasa = (230, 90, 25)
+                cor_nucleo = (255, 150, 60)
+                cor_glow = (120, 50, 15)
             for esc, cor, seed in capas:
                 pts = self._poly_chama(cx, base_y, H * esc, W * esc, seed)
                 pygame.draw.polygon(buf, cor, pts)
             self._blit_glow(buf, cx, int(base_y - H * 0.4), 18 + 34 * k,
-                            _escala((120, 50, 15), k))
+                            _escala(cor_glow, k))
 
         # Brasa que sobra
         e = (0.35 + 0.65 * p) * (1 - k)
         if e > 0.02:
             pulso = 0.6 + 0.4 * math.sin(t * 2.5)
             self._blit_glow(buf, cx, cy + 26, 14 + 12 * e,
-                            _escala((230, 90, 25), e * pulso))
+                            _escala(cor_brasa if k > 0.05 else (128, 226, 94) if self.vitoria else (230, 90, 25), e * pulso))
             pygame.draw.circle(
-                buf, _escala((255, 150, 60), 0.5 + 0.5 * pulso * e),
+                buf, _escala(cor_nucleo if k > 0.05 else (212, 255, 157) if self.vitoria else (255, 150, 60),
+                             0.5 + 0.5 * pulso * e),
                 (cx, cy + 26), 3
             )
 

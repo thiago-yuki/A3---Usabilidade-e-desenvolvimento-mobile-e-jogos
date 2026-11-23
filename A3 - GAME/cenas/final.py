@@ -18,8 +18,9 @@ class Final(Cena):
     responsável pela programação do gameplay.
     """
 
-    def __init__(self, jogo):
+    def __init__(self, jogo, resolucao=None):
         super().__init__(jogo)
+        self.largura, self.altura = resolucao or (config.LARGURA, config.ALTURA)
 
         # =====================================
         # FUNDO DO CASTELO
@@ -33,7 +34,7 @@ class Final(Cena):
         self.fundo = pygame.image.load(caminho_fundo).convert()
         self.fundo = pygame.transform.smoothscale(
             self.fundo,
-            (config.LARGURA, config.ALTURA)
+            (self.largura, self.altura)
         )
 
         # =====================================
@@ -50,8 +51,8 @@ class Final(Cena):
 
         for _ in range(9):
             self.nevoas.append({
-                "x": random.randint(-100, config.LARGURA),
-                "y": random.randint(350, config.ALTURA),
+                "x": random.randint(-100, self.largura),
+                "y": random.randint(350, self.altura),
                 "largura": random.randint(130, 260),
                 "altura": random.randint(35, 75),
                 "velocidade": random.uniform(15, 48),
@@ -84,8 +85,8 @@ class Final(Cena):
 
         for _ in range(7):
             self.fumacas.append({
-                "x": random.randint(-100, config.LARGURA),
-                "y": random.randint(250, config.ALTURA),
+                "x": random.randint(-100, self.largura),
+                "y": random.randint(250, self.altura),
                 "tamanho": random.randint(35, 80),
                 "velocidade": random.uniform(8, 18),
                 "alpha": random.randint(8, 17)
@@ -97,11 +98,11 @@ class Final(Cena):
 
     def _criar_brasa(self, random_y=False):
         return {
-            "x": random.randint(0, config.LARGURA),
+            "x": random.randint(0, self.largura),
             "y": (
-                random.randint(0, config.ALTURA)
+                random.randint(0, self.altura)
                 if random_y
-                else config.ALTURA + 10
+                else self.altura + 10
             ),
             "velocidade": random.uniform(30, 102),
             "tamanho": random.randint(2, 4),
@@ -110,11 +111,11 @@ class Final(Cena):
 
     def _criar_esporo(self, random_y=False):
         return {
-            "x": random.randint(0, config.LARGURA),
+            "x": random.randint(0, self.largura),
             "y": (
-                random.randint(0, config.ALTURA)
+                random.randint(0, self.altura)
                 if random_y
-                else config.ALTURA + 10
+                else self.altura + 10
             ),
             "velocidade": random.uniform(18, 54),
             "tamanho": random.randint(2, 4),
@@ -135,7 +136,7 @@ class Final(Cena):
         for nevoa in self.nevoas:
             nevoa["x"] += nevoa["velocidade"] * dt
 
-            if nevoa["x"] > config.LARGURA + 150:
+            if nevoa["x"] > self.largura + 150:
                 nevoa["x"] = -nevoa["largura"]
 
         # Brasas subindo com movimento lateral.
@@ -164,9 +165,9 @@ class Final(Cena):
         for fumaca in self.fumacas:
             fumaca["x"] += fumaca["velocidade"] * dt
 
-            if fumaca["x"] > config.LARGURA + 100:
+            if fumaca["x"] > self.largura + 100:
                 fumaca["x"] = -100
-                fumaca["y"] = random.randint(250, config.ALTURA)
+                fumaca["y"] = random.randint(250, self.altura)
 
     # =====================================
     # DESENHO DA NÉVOA
@@ -174,7 +175,7 @@ class Final(Cena):
 
     def _desenhar_nevoa(self, tela):
         camada = pygame.Surface(
-            (config.LARGURA, config.ALTURA),
+            (self.largura, self.altura),
             pygame.SRCALPHA
         )
 
@@ -205,7 +206,7 @@ class Final(Cena):
 
     def _desenhar_brasas(self, tela):
         camada = pygame.Surface(
-            (config.LARGURA, config.ALTURA),
+            (self.largura, self.altura),
             pygame.SRCALPHA
         )
 
@@ -233,7 +234,7 @@ class Final(Cena):
 
     def _desenhar_esporos(self, tela):
         camada = pygame.Surface(
-            (config.LARGURA, config.ALTURA),
+            (self.largura, self.altura),
             pygame.SRCALPHA
         )
 
@@ -259,7 +260,7 @@ class Final(Cena):
 
     def _desenhar_fumacas(self, tela):
         camada = pygame.Surface(
-            (config.LARGURA, config.ALTURA),
+            (self.largura, self.altura),
             pygame.SRCALPHA
         )
 
@@ -282,7 +283,7 @@ class Final(Cena):
 
     def _desenhar_iluminacao(self, tela):
         camada = pygame.Surface(
-            (config.LARGURA, config.ALTURA),
+            (self.largura, self.altura),
             pygame.SRCALPHA
         )
 

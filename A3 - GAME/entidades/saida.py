@@ -67,7 +67,7 @@ class Saida:
 
     def desenhar(self, tela, camera):
         r = camera.aplicar(self.rect)
-        if r.right < -80 or r.left > config.LARGURA + 80:
+        if r.right < -80 or r.left > tela.get_width() + 80:
             return
 
         if not self.bizarro:

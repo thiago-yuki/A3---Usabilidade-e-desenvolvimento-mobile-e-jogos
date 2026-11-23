@@ -3,7 +3,7 @@ import math
 
 import pygame
 
-from sistemas.recursos import imagem
+from sistemas.recursos import sprite
 
 _rotacionadas = {}
 
@@ -12,7 +12,7 @@ def _girar(nome, escala, angulo):
     """Imagem do projétil girada (com cache a cada 6 graus)."""
     chave = (nome, escala, round(angulo / 6))
     if chave not in _rotacionadas:
-        _rotacionadas[chave] = pygame.transform.rotate(imagem(nome, escala), round(angulo / 6) * 6)
+        _rotacionadas[chave] = pygame.transform.rotate(sprite(nome, escala), round(angulo / 6) * 6)
     return _rotacionadas[chave]
 
 
@@ -44,7 +44,7 @@ class BolaDeFogo:
             self.vivo = False
 
     def desenhar(self, tela):
-        img = _girar("fogo.png", 0.62, self.angulo)
+        img = _girar("fogo", 0.62, self.angulo - 90)
         r = img.get_rect()
         r.center = (round(self.pos.x), round(self.pos.y))
         tela.blit(img, r)
@@ -74,10 +74,15 @@ class OndaDeFogo:
             self.vivo = False
 
     def desenhar(self, tela):
-        img = imagem("fogo.png", 0.8, espelhar=self.vel < 0)
-        r = img.get_rect()
-        r.midbottom = (round(self.x + self.LARGURA / 2), self.chao_y + 6 - round(2 * math.sin(self.t * 20)))
-        tela.blit(img, r)
+        for indice, (deslocamento, escala) in enumerate(((20, 0.62), (48, 0.82), (76, 0.62))):
+            img = sprite("fogo", escala, espelhar=self.vel < 0)
+            r = img.get_rect()
+            ondulacao = round(3 * math.sin(self.t * 18 + indice * 1.7))
+            r.midbottom = (
+                round(self.x + deslocamento),
+                self.chao_y + 6 - ondulacao,
+            )
+            tela.blit(img, r)
 
 
 class Gosma:
@@ -104,7 +109,7 @@ class Gosma:
             self.vivo = False
 
     def desenhar(self, tela):
-        img = imagem("gosma.png", 0.62)
+        img = sprite("gosma", 0.62)
         r = img.get_rect()
         r.center = (round(self.pos.x), round(self.pos.y))
         tela.blit(img, r)

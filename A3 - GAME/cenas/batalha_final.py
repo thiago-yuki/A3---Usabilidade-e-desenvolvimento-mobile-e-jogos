@@ -3,7 +3,7 @@
 Tudo é desenhado numa tela lógica de 1280x720 e depois ajustado ao tamanho da janela,
 então funciona em HD (1280x720) e em Full HD (1920x1080) sem mudar nada aqui.
 
-Teclas:  A/D andar | ESPAÇO pular | E espada | Q gosma | K/SHIFT avançar | ESC pausa
+Teclas:  A/D andar | ESPAÇO pular | SHIFT espada | X/J gosma | K avançar | ESC pausa
 """
 import math
 import random
@@ -15,11 +15,14 @@ from entidades.dragao import Dragao
 from entidades.heroi_batalha import HeroiBatalha
 from entidades.plataforma import Plataforma
 from entidades.projeteis import BolaDeFogo, Gosma, OndaDeFogo
+from entidades.saida import Saida
 from nucleo.cena import Cena
+from nucleo.camera import Camera
 from sistemas import cenario as C
 from sistemas.audio import Audio
 from sistemas.hud_batalha import HudBatalha
-from sistemas.recursos import imagem, texto
+from sistemas.recursos import sprite, texto
+from cenas.final import Final
 
 LARG, ALT = C.LARGURA, C.ALTURA
 CHAO = C.CHAO_Y
@@ -27,22 +30,19 @@ PAREDE_X = 1040              # parede invisível: o herói não passa para o cas
 DRAGAO_X = 645               # canto esquerdo do sprite do dragão (corpo ~ x 880, na frente da porta)
 
 ESC_CAVALO = 0.85
-ESC_PRINCESA = 0.72
+ESC_PRINCESA = HeroiBatalha.ALTURA / 234
 CAVALO_PES = 242             # linha dos cascos no sprite do cavalo (340x256)
 
 # ---- Textos de orientação (mude aqui o que aparece na tela) ----
 # ---- Noite: depois de resgatar a princesa o pôr do sol vira noite ----
-NOITE_COMECA_EM = ("cs_cavalo", "cs_cavalgar", "fim_fade", "fim")   # estados da cutscene em que anoitece
-NOITE_DURACAO = 7.0            # segundos para o céu virar noite por completo
-
-DICA_INICIAL = "A/D andar   ESPAÇO pular   E espada   Q gosma   K avançar   ESC pausar"
+DICA_INICIAL = "A/D andar   ESPAÇO pular   SHIFT espada   X/J gosma   K avançar   ESC pausar"
 DICA_TAMANHO = 24                       # tamanho da letra da dica
 DICA_COR = (240, 236, 245)
 DICA_POS_Y = ALT - 28                   # altura da dica (ALT - 28 = rente à borda de baixo)
 DICA_SEGUNDOS = 9.0                     # por quanto tempo a dica fica na tela
 TECLAS_PAUSA = [                        # lista mostrada no menu de pausa
-    ("A / D", "andar"), ("ESPAÇO", "pular (2x no ar)"), ("E", "espada"),
-    ("Q", "gosma (em linha reta)"), ("K / SHIFT", "avançar"), ("ESC", "continuar"),
+    ("A / D", "andar"), ("ESPAÇO", "pular (2x no ar)"), ("SHIFT", "espada"),
+    ("X / J", "atirar gosma"), ("K", "avançar"), ("ESC", "continuar"),
 ]
 
 
@@ -56,28 +56,21 @@ class BatalhaFinal(Cena):
                                  "impacto_fogo", "pulo", "asas", "derrota"])
         self.canvas = pygame.Surface((LARG, ALT))
         self.mundo = pygame.Surface((LARG, ALT))
+        self.camera = Camera(LARG, ALT)
+        self.ambiente = Final(jogo, (LARG, ALT))
         self.hud = HudBatalha()
-        self.tentativa = 1
-        self.max_tentativas = config.BATALHA_TENTATIVAS
-        self.dragao = None
         self.fade = 1.0                       # 1 = preto total (abre no começo)
         self.pausado = False
-        self._nova_tentativa()
+        self._iniciar_batalha()
 
     # ================================================================ preparo
-    def _nova_tentativa(self):
+    def _iniciar_batalha(self):
         self.solidos = [Plataforma(-300, CHAO, LARG + 600, 300),
                         Plataforma(PAREDE_X, -600, 400, 1400)]
         self.heroi = HeroiBatalha(120, CHAO - HeroiBatalha.ALTURA)
         for habilidade in self.jogo.habilidades:
             self.heroi.desbloquear(habilidade)
-        if self.dragao is None:
-            self.dragao = Dragao(DRAGAO_X, CHAO)
-        elif config.BATALHA_RESETAR_DRAGAO:
-            self.dragao.vida = self.dragao.vida_max
-            self.dragao.reiniciar_comportamento()
-        else:
-            self.dragao.reiniciar_comportamento()
+        self.dragao = Dragao(DRAGAO_X, CHAO)
         self.hud.vida_visual = float(self.dragao.vida)
         self.bolas, self.ondas, self.gosmas, self.particulas = [], [], [], []
         self.tempo = 0.0
@@ -87,9 +80,10 @@ class BatalhaFinal(Cena):
         self.flash_cor = (255, 255, 255)
         self.flash_t = 0.0
         self.flash_dur = 0.3
-        self.porta_aberta = False
+        self.portal = Saida(*C.PORTA)
+        self.portal.bizarro = True
+        self.portal.selado = True
         self.luzes = 0
-        self.noite = 0.0                       # 0 = pôr do sol, 1 = noite
         self.estado = "intro"
         self.t_estado = 0.0
         self.fade = 1.0
@@ -114,11 +108,6 @@ class BatalhaFinal(Cena):
                 continue
             if self.estado in ("intro", "luta"):
                 self._tecla_luta(e.key)
-            elif e.key == pygame.K_RETURN:
-                if self.estado == "derrota" and self.t_estado > 1.6:
-                    self._continuar_apos_derrota()
-                elif self.estado == "fim" and self.t_estado > 1.0:
-                    self._sair_do_jogo()
 
     def _tecla_luta(self, tecla):
         h = self.heroi
@@ -126,13 +115,13 @@ class BatalhaFinal(Cena):
             if h.pulos_restantes > 0:
                 self.audio.tocar("pulo", 0.5)
             h.pular()
-        elif tecla == pygame.K_e:
+        elif tecla in (pygame.K_LSHIFT, pygame.K_RSHIFT):
             if h.tempo_recarga <= 0:
                 self.audio.tocar("espada")
             h.atacar()
-        elif tecla in (pygame.K_k, pygame.K_LSHIFT, pygame.K_RSHIFT):
+        elif tecla == pygame.K_k:
             h.avancar()
-        elif tecla == pygame.K_q:
+        elif tecla in (pygame.K_x, pygame.K_j):
             if h.pode_atirar():
                 x, y = h.boca_gosma
                 self.gosmas.append(Gosma(x, y, h.direcao))   # sai em linha reta, para onde o herói olha
@@ -164,22 +153,10 @@ class BatalhaFinal(Cena):
         self.audio.parar_musica()
         self.jogo.sair()
 
-    def _continuar_apos_derrota(self):
-        if self.tentativa < self.max_tentativas:
-            self.tentativa += 1
-            self._nova_tentativa()
-        else:
-            self._recomecar_jogo()
-
-    def _recomecar_jogo(self):
-        """Perdeu todas as tentativas: refaz tudo do zero.
-        Aqui só existe a batalha, então ela recomeça na tentativa 1. Quando as outras fases
-        forem integradas, troque o corpo deste método por: voltar para a Fase 1
-        (jogo.habilidades.clear() e jogo.trocar_cena(Fase(jogo, 1)))."""
+    def _mostrar_game_over(self):
         self.audio.parar_musica()
-        self.tentativa = 1
-        self.dragao.vida = self.dragao.vida_max
-        self._nova_tentativa()
+        from cenas.game_over import GameOver
+        self.jogo.trocar_cena(GameOver(self.jogo, 4))
 
     # ================================================================ efeitos
     def _tremer(self, forca, duracao):
@@ -209,10 +186,10 @@ class BatalhaFinal(Cena):
     def atualizar(self, dt):
         if self.pausado:
             return
+        self.ambiente.atualizar(dt)
+        self.portal.atualizar(dt)
         self.t_estado += dt
         self.tempo += dt
-        if self.estado in NOITE_COMECA_EM:
-            self.noite = min(1.0, self.noite + dt / NOITE_DURACAO)
         self.fade = max(0.0, self.fade - dt / 0.6) if self.estado != "fim_fade" else self.fade
         self.tremor_t = max(0.0, self.tremor_t - dt)
         self.flash_t = max(0.0, self.flash_t - dt)
@@ -224,8 +201,6 @@ class BatalhaFinal(Cena):
             self._atualizar_luta(dt)
             if e == "intro" and self.t_estado >= 2.6:
                 self._ir("luta")
-        elif e == "derrota":
-            pass
         elif e.startswith("cs_") or e == "fim_fade":
             self._atualizar_cutscene(dt)
 
@@ -282,10 +257,8 @@ class BatalhaFinal(Cena):
         self._processar_eventos_dragao()
 
         if h.vida <= 0 and self.estado == "luta":
-            h.invencivel = 0.0
-            self.audio.parar_musica()
             self.audio.tocar("derrota")
-            self._ir("derrota")
+            self._mostrar_game_over()
 
     def _dano_heroi(self, origem_x):
         h = self.heroi
@@ -358,14 +331,12 @@ class BatalhaFinal(Cena):
             if ev[0] == "asas":
                 self.audio.tocar("asas", ev[1] if len(ev) > 1 else 1.0)
         d.eventos.clear()
-        h.tempo_anim += dt
-
         if e == "cs_dragao":
             if d.estado == "morrendo" and t >= 1.6:
                 d.fugir()
                 self._tremer(6, 0.6)
             if d.estado == "fugindo" and (d.fora_da_tela or t > 6.0):
-                self.porta_aberta = True
+                self.portal.selado = False
                 self._silenciar()                       # o dragão já foi embora: nada de asas
                 self.audio.tocar("porta")
                 self._ir("cs_porta")
@@ -453,16 +424,17 @@ class BatalhaFinal(Cena):
         elif e == "fim_fade":
             self.cs_fade = min(1.0, t / 1.2)
             if t >= 1.4:
-                self._ir("fim")
+                self.audio.parar_musica()
+                from cenas.game_over import GameOver
+                self.jogo.trocar_cena(GameOver(self.jogo, 4, vitoria=True))
 
     # ================================================================ desenho
     def desenhar(self, tela):
         m = self.mundo
-        m.blit(imagem("fundo_batalha.png"), (0, 0))
-        self._desenhar_noite(m)
-        self._desenhar_cenario(m)
+        self.ambiente.desenhar(m)
+        self.solidos[0].desenhar(m, self.camera, tema=4)
+        self.portal.desenhar(m, self.camera)
         self._desenhar_atores(m)
-        self._tingir_noite(m)
         for p in self.particulas:
             pygame.draw.circle(m, p[6], (round(p[0]), round(p[1])), p[7])
 
@@ -479,18 +451,16 @@ class BatalhaFinal(Cena):
             sobre.set_alpha(int(190 * self.flash_t / max(self.flash_dur, 0.01)))
             c.blit(sobre, (0, 0))
 
-        if self.estado in ("intro", "luta", "derrota"):
-            self.hud.desenhar(c, self.heroi, self.dragao, self.tentativa, self.max_tentativas)
+        if self.estado in ("intro", "luta"):
+            self.hud.desenhar(c, self.heroi, self.dragao)
         self._desenhar_textos(c)
 
-        if self.estado in ("fim_fade", "fim") or self.fade > 0:
-            nivel = 1.0 if self.estado == "fim" else (self.cs_fade if self.estado == "fim_fade" else self.fade)
+        if self.estado == "fim_fade" or self.fade > 0:
+            nivel = self.cs_fade if self.estado == "fim_fade" else self.fade
             if nivel > 0:
                 preto = pygame.Surface((LARG, ALT))
                 preto.set_alpha(int(255 * nivel))
                 c.blit(preto, (0, 0))
-        if self.estado == "fim":
-            self._desenhar_fim(c)
 
         if self.pausado:
             self._desenhar_pausa(c)
@@ -499,66 +469,6 @@ class BatalhaFinal(Cena):
             tela.blit(c, (0, 0))
         else:
             tela.blit(pygame.transform.smoothscale(c, tela.get_size()), (0, 0))
-
-    # ----- noite
-    def _desenhar_noite(self, m):
-        """Mistura aos poucos o céu da noite (fundo_noite.png) por cima do pôr do sol."""
-        if self.noite <= 0:
-            return
-        suave = self.noite * self.noite * (3 - 2 * self.noite)      # começa e termina devagar
-        try:
-            ceu = imagem("fundo_noite.png")
-        except (pygame.error, OSError):
-            ceu = None                                              # sem a imagem: só escurece
-        if ceu is not None:
-            ceu.set_alpha(int(255 * suave))
-            m.blit(ceu, (0, 0))
-
-    def _tingir_noite(self, m):
-        """Luz azulada da lua sobre personagens e castelo (e escurece se faltar fundo_noite.png)."""
-        if self.noite <= 0:
-            return
-        suave = self.noite * self.noite * (3 - 2 * self.noite)
-        tom = pygame.Surface((LARG, ALT))
-        tom.fill((255 - int(75 * suave), 255 - int(62 * suave), 255 - int(20 * suave)))
-        m.blit(tom, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
-
-    # ----- cenário
-    def _janela_acesa(self, m, cx, cy, w, h, forca=1.0):
-        halo = pygame.Surface((w + 70, h + 70), pygame.SRCALPHA)
-        pygame.draw.ellipse(halo, (255, 190, 90, int(70 * forca)), halo.get_rect())
-        m.blit(halo, (cx - (w + 70) // 2, cy - (h + 70) // 2))
-        vidro = pygame.Surface((w, h), pygame.SRCALPHA)
-        pygame.draw.ellipse(vidro, (255, 226, 150, int(255 * forca)), (0, 0, w, w))
-        pygame.draw.rect(vidro, (255, 226, 150, int(255 * forca)), (0, w // 2, w, h - w // 2))
-        m.blit(vidro, (cx - w // 2, cy - h // 2))
-
-    def _desenhar_cenario(self, m):
-        for tx, ty in C.TOCHAS:  # tochas tremeluzindo
-            r = 9 + random.randint(0, 3)
-            halo = pygame.Surface((90, 90), pygame.SRCALPHA)
-            pygame.draw.circle(halo, (255, 150, 50, int(45 + 70 * self.noite)), (45, 45), 40)
-            m.blit(halo, (tx - 45, ty - 40))
-            pygame.draw.ellipse(m, (255, 130, 30), (tx - r // 2 - 2, ty - r - 6, r + 4, r + 12))
-            pygame.draw.ellipse(m, (255, 226, 120), (tx - r // 3, ty - r // 2 - 2, r * 2 // 3 + 2, r + 2))
-        if not self.porta_aberta:
-            m.blit(imagem("porta.png"), (C.PORTA[0], C.PORTA[1]))
-
-        # janelas da torre acesas durante a subida do herói
-        if self.estado in ("cs_subindo", "cs_princesa", "cs_cavalo", "cs_cavalgar", "fim_fade", "fim"):
-            for cx, cy, w, h in C.JANELAS_TORRE[:self.luzes]:
-                self._janela_acesa(m, cx, cy, w, h)
-
-        # janela da princesa (sempre acesa, com ela dentro)
-        cx, cy, w, h = C.JANELA_PRINCESA
-        self._janela_acesa(m, cx, cy, w, h, 0.9)
-        balanco = round(math.sin(self.tempo * 1.6) * 1.5)
-        pe_sacada = cy + h // 2 + 2          # chão da sacada
-        if self.estado == "cs_princesa":     # herói e princesa juntos na sacada
-            m.blit(imagem("princesa.png", 0.40), (cx - 40, pe_sacada - round(176 * 0.40)))
-            m.blit(imagem("heroi_parado.png", 0.30), (cx + 22 - round(88 * 0.30), pe_sacada - round(234 * 0.30)))
-        else:
-            m.blit(imagem("princesa.png", 0.40), (cx - 22, pe_sacada - round(176 * 0.40) + balanco))
 
     # ----- personagens
     def _sombra(self, m, cx, largura, alfa=90):
@@ -569,13 +479,13 @@ class BatalhaFinal(Cena):
     def _desenhar_atores(self, m):
         e = self.estado
         h, d = self.heroi, self.dragao
-        if e in ("intro", "luta", "derrota", "cs_dragao", "cs_porta", "cs_cavalo"):
+        if e in ("intro", "luta", "cs_dragao", "cs_porta", "cs_cavalo"):
             self._sombra(m, h.rect.centerx, 90)
         if d.estado != "fugindo" or not d.fora_da_tela:
             d.desenhar_sombra(m)
             d.desenhar(m)
 
-        if e in ("intro", "luta", "derrota", "cs_dragao"):
+        if e in ("intro", "luta", "cs_dragao"):
             h.desenhar(m)
         elif e == "cs_porta":
             h.desenhar(m, alfa=self.cs_alfa_heroi)
@@ -594,14 +504,14 @@ class BatalhaFinal(Cena):
             g.desenhar(m)
 
     def _desenhar_princesa(self, m, x_centro, alfa=255):
-        img = imagem("princesa.png", ESC_PRINCESA, self.heroi.direcao == -1)
+        img = sprite("princesa", ESC_PRINCESA, self.heroi.direcao == -1)
         if alfa < 255:
             img = img.copy()
             img.set_alpha(alfa)
-        m.blit(img, (round(x_centro - img.get_width() / 2), CHAO - round(176 * ESC_PRINCESA)))
+        m.blit(img, (round(x_centro - img.get_width() / 2), CHAO - img.get_height()))
 
     def _desenhar_cavalo(self, m, cx, espelhar, com_cavaleiros):
-        img = imagem("cavalo.png", ESC_CAVALO, espelhar)
+        img = sprite("cavalo", ESC_CAVALO, espelhar)
         correndo = self.estado in ("cs_cavalgar", "fim_fade") or (self.estado == "cs_cavalo" and not self.cav_chegou and self.t_estado > 0.6)
         bob = round(abs(math.sin(self.tempo * 14)) * 7) if correndo else 0
         topo = CHAO - round(CAVALO_PES * ESC_CAVALO) - bob
@@ -613,11 +523,16 @@ class BatalhaFinal(Cena):
         sela_y = topo + round(72 * ESC_CAVALO)
         sela_x = cx + sinal * round(-20 * ESC_CAVALO)
         # princesa (atrás) e herói (na frente)
-        prin = imagem("princesa.png", 0.5, espelhar)
-        m.blit(prin, (round(sela_x - sinal * 30 - prin.get_width() / 2), sela_y + 8 - round(176 * 0.5)))
-        her = imagem("heroi_parado.png", 0.40, espelhar)
-        ax = (240 - 88) if espelhar else 88
-        m.blit(her, (round(sela_x + sinal * 12 - ax * 0.40), sela_y + 14 - round(234 * 0.40)))
+        prin = sprite("princesa", ESC_PRINCESA, espelhar)
+        m.blit(prin, (
+            round(sela_x - sinal * 30 - prin.get_width() / 2),
+            sela_y + 18 - prin.get_height(),
+        ))
+        her = self.heroi.imagem_personagem(
+            (self.heroi.LARGURA, self.heroi.ALTURA), espelhar=espelhar
+        )
+        ax = round(self.heroi.LARGURA * (152 / 240 if espelhar else 88 / 240))
+        m.blit(her, (round(sela_x + sinal * 12 - ax), sela_y + 14 - her.get_height()))
 
     # ----- textos
     def _alfa_pulso(self, t, entrada=0.5, total=2.6, saida=0.6):
@@ -636,25 +551,6 @@ class BatalhaFinal(Cena):
         elif e == "luta" and t < DICA_SEGUNDOS:
             a = int(255 * min(1.0, (DICA_SEGUNDOS - t) / 1.5))
             texto(c, DICA_INICIAL, DICA_TAMANHO, DICA_COR, (LARG // 2, DICA_POS_Y), alfa=a)
-        elif e == "derrota":
-            a = int(255 * min(1.0, max(0.0, (t - 0.5) / 0.6)))
-            if a > 0:
-                veu = pygame.Surface((LARG, ALT))
-                veu.fill((10, 6, 18))
-                veu.set_alpha(int(a * 0.7))
-                c.blit(veu, (0, 0))
-                restantes = self.max_tentativas - self.tentativa
-                if restantes > 0:
-                    texto(c, "VOCÊ CAIU...", 84, (230, 70, 64), (LARG // 2, 290), alfa=a)
-                    texto(c, f"Tentativas restantes: {restantes}", 36, (245, 240, 250), (LARG // 2, 366), alfa=a)
-                    if t > 1.6:
-                        texto(c, "ENTER - tentar de novo", 28, (210, 206, 220), (LARG // 2, 430))
-                else:
-                    texto(c, "O DRAGÃO VENCEU", 84, (230, 70, 64), (LARG // 2, 290), alfa=a)
-                    texto(c, "Acabaram as tentativas: a jornada recomeça do início.", 32, (245, 240, 250),
-                          (LARG // 2, 366), alfa=a)
-                    if t > 1.6:
-                        texto(c, "ENTER - recomeçar", 28, (210, 206, 220), (LARG // 2, 430))
         elif e == "cs_princesa":
             a = int(255 * self._alfa_pulso(t, 0.6, 3.2, 0.6))
             texto(c, "Você a encontrou!", 52, (255, 226, 150), (LARG // 2, 110), alfa=a)
@@ -671,12 +567,3 @@ class BatalhaFinal(Cena):
             texto(c, acao, 30, (240, 236, 245), (LARG // 2 + 30, y), "esquerda")
             y += 44
         texto(c, "ENTER - sair do jogo", 28, (210, 206, 220), (LARG // 2, y + 30))
-
-    def _desenhar_fim(self, c):
-        t = self.t_estado
-        a = int(255 * min(1.0, t / 1.0))
-        texto(c, "FIM", 120, (255, 214, 120), (LARG // 2, 270), alfa=a)
-        texto(c, "A Última Chama de Esparta", 40, (245, 240, 250), (LARG // 2, 372), alfa=a)
-        texto(c, "Obrigado por jogar!", 30, (210, 206, 220), (LARG // 2, 430), alfa=a)
-        if t > 1.0:
-            texto(c, "ENTER - sair", 26, (170, 166, 184), (LARG // 2, 560))

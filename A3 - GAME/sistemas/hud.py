@@ -60,7 +60,10 @@ class Hud:
 
     def _desenhar_painel_vidas(self, tela, jogador):
         x, y = 16, 15
-        largura, altura = 174, 59
+        total_vidas = max(1, int(jogador.vida_max))
+        espacamento = 46 if total_vidas <= 3 else 37
+        largura = max(174, 59 + (total_vidas - 1) * espacamento)
+        altura = 59
         painel = pygame.Surface((largura, altura), pygame.SRCALPHA)
         pygame.draw.rect(
             painel, (27, 20, 42, 235), (0, 0, largura, altura), border_radius=11
@@ -81,10 +84,9 @@ class Hud:
         )
         tela.blit(painel, (x, y))
 
-        total_vidas = max(1, int(jogador.vida_max))
         vidas_atuais = max(0, min(total_vidas, int(jogador.vida)))
         for i in range(total_vidas):
-            centro_x = x + 28 + i * 46
+            centro_x = x + 28 + i * espacamento
             centro_y = y + 29
             pygame.draw.circle(tela, (40, 29, 51), (centro_x, centro_y), 17)
             cor_aro = (
@@ -93,6 +95,9 @@ class Hud:
             pygame.draw.circle(tela, cor_aro, (centro_x, centro_y), 17, 1)
             coracao = self.coracao_cheio if i < vidas_atuais else self.coracao_vazio
             tela.blit(coracao, (centro_x - 15, centro_y - 14))
+
+    def desenhar_vidas(self, tela, jogador):
+        self._desenhar_painel_vidas(tela, jogador)
 
     def _desenhar_titulo_fase(self, tela, numero):
         largura, altura = 184, 54
@@ -182,6 +187,6 @@ class Hud:
         tela.blit(imagem, imagem.get_rect(center=(config.LARGURA // 2, y + altura // 2)))
 
     def desenhar(self, tela, jogador, numero=1):
-        self._desenhar_painel_vidas(tela, jogador)
+        self.desenhar_vidas(tela, jogador)
         self._desenhar_titulo_fase(tela, numero)
         self._desenhar_habilidades(tela, jogador)

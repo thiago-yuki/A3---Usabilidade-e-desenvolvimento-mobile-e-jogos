@@ -1,19 +1,84 @@
-"""Coordenadas do cenário da batalha final (em pixels da tela lógica 1280x720).
-Usado pela cena e pelo gerador do fundo (ferramentas/gerar_fundo.py)."""
+"""Opcional audio for the final battle."""
+import logging
+import os
 
-LARGURA = 1280
-ALTURA = 720
-CHAO_Y = 640                      # topo do chão
+import pygame
 
-# Vão da porta do castelo: x, y, largura, altura (arco no topo)
-PORTA = (1072, 520, 80, 120)
-PORTA_CENTRO_X = 1112
 
-# Janelas da torre principal (cx, cy, largura, altura), de baixo para cima
-JANELAS_TORRE = [(1215, 548, 26, 44), (1215, 452, 26, 44),
-                 (1215, 356, 26, 44), (1215, 262, 26, 44)]
-# Janela do alto, onde a princesa aparece
-JANELA_PRINCESA = (1215, 168, 56, 84)
+_LOGGER = logging.getLogger(__name__)
+_EXTENSOES = (".wav", ".ogg", ".mp3")
 
-# Tochas ao lado da porta (x, y)
-TOCHAS = [(1062, 556), (1162, 556)]
+
+class Audio:
+    def __init__(self):
+        self.ativo = False
+        self.sons = {}
+        self._avisos = set()
+        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.pasta_sons = os.path.join(raiz, "sons")
+
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+        except pygame.error as erro:
+            self._avisar("mixer", f"Audio da batalha desativado: {erro}")
+            return
+
+        self.ativo = True
+
+    def _avisar(self, chave, mensagem):
+        if chave not in self._avisos:
+            _LOGGER.warning(mensagem)
+            self._avisos.add(chave)
+
+    def _arquivo(self, nome):
+        for extensao in _EXTENSOES:
+            caminho = os.path.join(self.pasta_sons, nome + extensao)
+            if os.path.isfile(caminho):
+                return caminho
+        return None
+
+    def pre_carregar(self, nomes):
+        if not self.ativo:
+            return
+
+        ausentes = []
+        for nome in nomes:
+            caminho = self._arquivo(nome)
+            if caminho is None:
+                ausentes.append(nome)
+                continue
+            try:
+                self.sons[nome] = pygame.mixer.Sound(caminho)
+            except (pygame.error, OSError) as erro:
+                self._avisar(nome, f"Nao foi possivel carregar o som '{nome}': {erro}")
+
+        if ausentes:
+            self._avisar(
+                "sons-ausentes",
+                "Sons opcionais da batalha nao encontrados em 'sons/': "
+                + ", ".join(ausentes),
+            )
+
+    def tocar(self, nome, volume=1.0):
+        som = self.sons.get(nome)
+        if self.ativo and som is not None:
+            som.set_volume(max(0.0, min(1.0, volume)))
+            som.play()
+
+    def musica(self, nome):
+        if not self.ativo:
+            return
+        caminho = self._arquivo(nome)
+        if caminho is None:
+            self._avisar(nome, f"Musica opcional '{nome}' nao encontrada em 'sons/'.")
+            return
+        try:
+            pygame.mixer.music.load(caminho)
+            pygame.mixer.music.play(-1)
+        except (pygame.error, OSError) as erro:
+            self._avisar(nome, f"Nao foi possivel iniciar a musica '{nome}': {erro}")
+
+    def parar_musica(self):
+        if self.ativo:
+            pygame.mixer.music.stop()

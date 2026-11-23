@@ -14,7 +14,7 @@ import pygame
 
 import config
 from entidades.projeteis import BolaDeFogo, OndaDeFogo
-from sistemas.recursos import imagem
+from sistemas.recursos import sprite
 
 ESC = 0.87            # sprite 520x372 -> ~452x324: o dobro da altura do herói
 PES = 351             # linha dos pés no sprite original
@@ -249,8 +249,8 @@ class Dragao:
     def _nome_sprite(self):
         voando = self.estado in ("decolando", "voando", "pousando", "fugindo") and self.altura > 12
         if voando:
-            return "dragao_voando.png" if int(self.tempo * 4.5) % 2 == 0 else "dragao_chao.png"
-        return "dragao_chao.png"
+            return "dragao_voando" if int(self.tempo * 4.5) % 2 == 0 else "dragao_chao"
+        return "dragao_chao"
 
     def desenhar_sombra(self, tela):
         if self.estado == "fugindo" and self.altura > 300:
@@ -262,7 +262,7 @@ class Dragao:
         tela.blit(sombra, (round(self.x + 235 * ESC - w / 2 + 60), self.chao_y - h // 2 + 4))
 
     def desenhar(self, tela):
-        img = imagem(self._nome_sprite(), ESC)
+        img = sprite(self._nome_sprite(), ESC)
         pos = (round(self.x), round(self.topo))
         tremer = 3 if self.estado in ("mirando", "onda") else 0
         if tremer:

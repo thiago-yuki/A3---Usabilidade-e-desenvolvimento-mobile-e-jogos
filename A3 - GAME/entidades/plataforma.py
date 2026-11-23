@@ -11,11 +11,12 @@ class Plataforma:
 
         r = camera.aplicar(self.rect)
 
+        largura_tela, altura_tela = tela.get_size()
         if (
             r.right < 0
-            or r.left > config.LARGURA
+            or r.left > largura_tela
             or r.bottom < 0
-            or r.top > config.ALTURA
+            or r.top > altura_tela
         ):
             return
 
@@ -86,18 +87,18 @@ class Plataforma:
         else:
 
             pedras = [
-                (39, 34, 39),
-                (49, 38, 41),
-                (32, 31, 38),
-                (57, 42, 43),
-                (43, 39, 46)
+                (62, 54, 55),
+                (76, 64, 62),
+                (54, 50, 54),
+                (88, 70, 65),
+                (69, 61, 64)
             ]
 
-            contorno = (17, 16, 23)
-            luz = (112, 70, 68)
-            sombra = (19, 17, 23)
-            musgo = (55, 91, 49)
-            detalhe = (102, 139, 68)
+            contorno = (30, 26, 30)
+            luz = (147, 118, 92)
+            sombra = (37, 30, 31)
+            musgo = (74, 70, 60)
+            detalhe = (151, 113, 73)
 
         # =====================================
         # BASE DA PLATAFORMA
@@ -223,7 +224,7 @@ class Plataforma:
                             1
                         )
 
-                    # Rachaduras mágicas da Fase 4
+                    # Rachaduras do castelo
                     elif tema == 4:
 
                         # Núcleo vermelho incandescente
@@ -294,7 +295,7 @@ class Plataforma:
                     )
 
                 # =====================================
-                # VEIOS MÁGICOS - FASE 4
+                # VEIOS DE PEDRA E BRONZE - CASTELO
                 # =====================================
 
                 if (
@@ -313,7 +314,7 @@ class Plataforma:
 
                         pygame.draw.lines(
                             tela,
-                            (65, 105, 52),
+                            (132, 91, 59),
                             False,
                             [
                                 (x + 5, y + altura - 7),
@@ -327,7 +328,7 @@ class Plataforma:
 
                         pygame.draw.line(
                             tela,
-                            (112, 43, 37),
+                            (175, 118, 69),
                             (x + 7, y + altura - 6),
                             (x + 15, y + altura - 11),
                             2
@@ -345,7 +346,7 @@ class Plataforma:
             1: (132, 120, 141),
             2: (142, 163, 180),
             3: (111, 151, 84),
-            4: (126, 65, 55)
+            4: (169, 122, 82)
         }
 
         pygame.draw.line(

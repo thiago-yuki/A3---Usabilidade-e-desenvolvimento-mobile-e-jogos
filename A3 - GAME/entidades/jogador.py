@@ -430,7 +430,7 @@ class Jogador:
         rect = camera.aplicar(self.rect)
         self._desenhar_guerreira(tela, rect)
 
-    def _desenhar_guerreira(self, tela, rect):
+    def _desenhar_guerreira(self, tela, rect, desenhar_arma=True, ocultar_braco_arma=False):
         """Desenha a Mulher Guerreira com Espingarda Calibre 12 (Fase 1) ou Besta (Fase 3)."""
         d = self.direcao
         cx = rect.centerx
@@ -591,6 +591,16 @@ class Jogador:
             pygame.draw.line(tela, cor_pele_sombra, (cx, rect.y + 21), (cx + lado_agarre * 10, mao_y2), 3)
             pygame.draw.circle(tela, cor_pele, (cx + lado_agarre * 11, mao_y1), 3)
             pygame.draw.circle(tela, cor_pele_sombra, (cx + lado_agarre * 10, mao_y2), 3)
+            return
+
+        if not desenhar_arma:
+            for lado, cor in ((-1, cor_pele_sombra), (1, cor_pele)):
+                if lado == self.direcao and (self.atacando or ocultar_braco_arma):
+                    continue
+                ombro = (cx + lado * 7, rect.y + 21)
+                mao = (cx + lado * 11, rect.y + 34)
+                pygame.draw.line(tela, cor, ombro, mao, 4)
+                pygame.draw.circle(tela, cor, mao, 3)
             return
 
         # 8. Desenho da Arma: Besta de 3 tiros (Fase 3) ou Espingarda Calibre 12 (Fase 1)
