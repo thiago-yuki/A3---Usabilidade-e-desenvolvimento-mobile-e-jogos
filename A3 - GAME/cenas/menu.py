@@ -118,7 +118,6 @@ class Menu(Cena):
             "COMO JOGAR",
             "CRÉDITOS",
             "SAIR",
-            "TESTAR BOSS FINAL",
         ]
         self.selecionado = 0
 
@@ -734,12 +733,6 @@ class Menu(Cena):
         self.jogo.habilidades.clear()
         self.jogo.trocar_cena(Fase(self.jogo, numero))
 
-    def _iniciar_batalha_final(self):
-        from cenas.batalha_final import BatalhaFinal
-
-        self.jogo.habilidades.clear()
-        self.jogo.trocar_cena(BatalhaFinal(self.jogo))
-
     def _agendar(self, acao):
         self._acao_pendente = acao
         self._fade_saida = 0.0
@@ -751,9 +744,6 @@ class Menu(Cena):
     def _ativar(self, nome):
         if nome == "JOGAR":
             self._agendar(lambda: self._iniciar(1))
-
-        elif nome == "TESTAR BOSS FINAL":
-            self._agendar(self._iniciar_batalha_final)
 
         elif nome == "COMO JOGAR":
             self._mudar_tela("como_jogar")
@@ -795,9 +785,6 @@ class Menu(Cena):
                     elif e.key == pygame.K_2:
                         # atalho de desenvolvimento (sem texto na tela)
                         self._agendar(lambda: self._iniciar(2))
-
-                    elif e.key == pygame.K_3:
-                        self._agendar(self._iniciar_batalha_final)
 
                     elif e.key == pygame.K_ESCAPE:
                         self._agendar(self.jogo.sair)
