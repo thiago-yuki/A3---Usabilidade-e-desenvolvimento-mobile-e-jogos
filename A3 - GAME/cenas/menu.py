@@ -742,12 +742,8 @@ class Menu(Cena):
     def _iniciar(self, numero):
         self.jogo.parar_musica()
         self.jogo.habilidades.clear()
-        if numero == 4:
-            from cenas.batalha_final import BatalhaFinal
-            self.jogo.trocar_cena(BatalhaFinal(self.jogo))
-        else:
-            from cenas.fase import Fase
-            self.jogo.trocar_cena(Fase(self.jogo, numero))
+        from cenas.fase import Fase
+        self.jogo.trocar_cena(Fase(self.jogo, numero))
 
     def _agendar(self, acao):
         self._acao_pendente = acao

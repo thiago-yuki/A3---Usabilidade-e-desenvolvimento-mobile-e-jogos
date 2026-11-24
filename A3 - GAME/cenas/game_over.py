@@ -528,12 +528,8 @@ class GameOver(Cena):
 
     def _executar_destino(self):
         if self.destino == "fase":
-            if self.numero == 4:
-                from cenas.batalha_final import BatalhaFinal
-                self.jogo.trocar_cena(BatalhaFinal(self.jogo))
-            else:
-                from cenas.fase import Fase
-                self.jogo.trocar_cena(Fase(self.jogo, self.numero))
+            from cenas.fase import Fase
+            self.jogo.trocar_cena(Fase(self.jogo, self.numero))
         else:
             from cenas.menu import Menu
             self.jogo.trocar_cena(Menu(self.jogo))

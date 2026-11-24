@@ -39,6 +39,9 @@ class Jogo:
             return
         self._iniciar_musica(arquivo)
 
+    def iniciar_musica_final(self):
+        self._iniciar_musica("final.mp3")
+
     def _iniciar_musica(self, arquivo):
         if arquivo in self._musicas_indisponiveis:
             return

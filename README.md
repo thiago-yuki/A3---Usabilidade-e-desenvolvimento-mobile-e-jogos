@@ -197,6 +197,7 @@ As músicas das fases são disponibilizadas sob licença CC0 no [OpenGameArt.org
 - [Medieval: King's Feast](https://opengameart.org/content/medieval-kings-feast).
 - [Game Over](https://opengameart.org/content/game-over-8) — o autor solicita ser creditado como “Umplix”, caso seja dado crédito.
 - [Medieval: Victory Theme](https://opengameart.org/content/medieval-victory-theme).
+- [Medieval: Rejoicing](https://opengameart.org/content/medieval-rejoicing).
 
 Os efeitos sonoros sintetizados em tempo de execução estão implementados em `A3 - GAME/sistemas/sons.py`.
 

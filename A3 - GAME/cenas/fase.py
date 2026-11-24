@@ -16,6 +16,7 @@ from entidades.inimigos_comuns import (
 )
 from entidades.obstaculos import OrbeChama
 from entidades.projetil import ProjetilPlasma, ParticulaPlasma
+from entidades.dragao_vermelho import DragaoVermelho, VIDAS as VIDAS_DRAGAO, TIROS_POR_VIDA
 from entidades.reliquia import Reliquia
 from entidades.barreira import Barreira
 from entidades.saida import Saida
@@ -226,11 +227,13 @@ class Fase(Cena):
         self.numero = numero
         eh_fase_2 = (numero == 2)
         eh_fase_3 = (numero == 3)
+        eh_fase_4 = (numero == 4)   # fase final: tela estática (câmera parada)
 
         nomes_fundos = {
             1: "fundo_fase1.png",
             2: "fundo_fase2.jpeg",
             3: "fundo_fase3.jpeg",
+            4: "fundofase4.jpeg",
         }
         raiz_projeto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         caminho_fundo = os.path.join(
@@ -248,7 +251,9 @@ class Fase(Cena):
         self.fonte_combo = pygame.font.Font(None, 34)
         self.t = 0.0
         self.sons = Sons()
+        self.timer_passo = 0.0
         self._trocando = False
+        self.contagem_epilogo = None   # Fase 4: segundos até a tela 5 (depois que o dragão foge)
 
         dados = carregar_mapa(numero)
         self.largura, self.altura = dados.largura, dados.altura
@@ -309,6 +314,9 @@ class Fase(Cena):
                 self.inimigos.append(guardiao)
                 if self.chefe is None:
                     self.chefe = guardiao
+            if eh_fase_4:   # Fase 4: o chefe 'C' do mapa é o Dragão Vermelho
+                self.inimigos = [DragaoVermelho(ix, iy) for ix, iy in getattr(dados, "chefes", [])]
+                self.chefe = self.inimigos[0] if self.inimigos else None
 
         # ---------- listas de efeitos / objetos ----------
         self.projeteis = []
@@ -376,6 +384,8 @@ class Fase(Cena):
 
         self.camera = Camera(self.largura, self.altura)
         self.camera.centralizar(self.jogador.rect)
+        if eh_fase_4:
+            self._fixar_camera()
         self.hud = Hud()
         self.mensagem = None
         self.tempo_mensagem = 0.0
@@ -385,6 +395,13 @@ class Fase(Cena):
             self.mensagem = (
                 "Cemitério das Almas Pálidas",
                 "Plasma (J/X) ou Dash Hitkill (K/SHIFT) para eliminar fantasmas e abrir o Portal Dimensional!"
+            )
+            self.tempo_mensagem = 4.5
+
+        if eh_fase_4:
+            self.mensagem = (
+                "Fase 4 - O Castelo das Três Maldições",
+                "Derrote o Dragão Vermelho, guardião do castelo! (J/X atira, ESPAÇO pula)",
             )
             self.tempo_mensagem = 4.5
 
@@ -398,6 +415,17 @@ class Fase(Cena):
         self.jogo.iniciar_musica_fase(self.numero)
 
     # ---------- utilidades ----------
+    def _fixar_camera(self):
+        """Fase 4 é uma tela só: a câmera não segue o jogador (o chão fica na parte de baixo)."""
+        self.camera.x = 0.0
+        self.camera.y = float(max(0, self.altura - config.ALTURA))
+
+    def _atualizar_camera(self, dt):
+        if self.numero == 4:
+            self._fixar_camera()
+        else:
+            self.camera.seguir(self.jogador.rect, dt)
+
     def _som(self, nome):
         self.sons.tocar(nome)
 
@@ -755,9 +783,36 @@ class Fase(Cena):
             if getattr(inimigo, "tremor_pendente", False):
                 inimigo.tremor_pendente = False
                 self._tremer_camera(0.22, 8)
+            if isinstance(inimigo, DragaoVermelho):
+                self._eventos_dragao(inimigo)
 
         if novos_fantasmas:
             self.inimigos.extend(novos_fantasmas)
+
+    def _eventos_dragao(self, dragao):
+        """Sons, tremor e mensagens do Dragão Vermelho (Fase 4)."""
+        for ev in dragao.eventos:
+            if ev == "rugido":
+                self._som("trovao")
+                self._tremer_camera(0.5, 9)
+            elif ev == "fogo":
+                self._som("invocar")
+            elif ev == "pouso":
+                self._som("portao")
+            elif ev == "vida":
+                restantes = dragao.vidas_restantes
+                self.mensagem = ("O Dragão perdeu uma vida!", f"Vidas restantes: {restantes} de {VIDAS_DRAGAO}")
+                self.tempo_mensagem = 2.2
+            elif ev == "derrotado":
+                self.hitstop = 0.06
+                self.ondas_sombrias.clear()
+                self.mensagem = ("O Dragão Vermelho foi derrotado!", "Ele foge voando para longe...")
+                self.tempo_mensagem = 4.0
+            elif ev == "fugiu":
+                self.mensagem = ("O caminho para o castelo está livre!", "")
+                self.tempo_mensagem = 5.0
+                self.contagem_epilogo = 3.5      # em seguida vai para a tela 5 (epílogo)
+        dragao.eventos.clear()
 
     def _atualizar_projeteis(self, dt):
         for proj in self.projeteis:
@@ -777,9 +832,17 @@ class Fase(Cena):
     def atualizar(self, dt):
         self.t += dt
 
+        if self.contagem_epilogo is not None:
+            self.contagem_epilogo -= dt
+            if self.contagem_epilogo <= 0 and not self._trocando:
+                self._trocando = True
+                from cenas.epilogo import Epilogo
+                self.jogo.trocar_cena(Epilogo(self.jogo))
+                return
+
         if self.hitstop > 0:
             self.hitstop = max(0.0, self.hitstop - dt)
-            self.camera.seguir(self.jogador.rect, dt)
+            self._atualizar_camera(dt)
             return
 
         if self.numero == 2:
@@ -799,6 +862,14 @@ class Fase(Cena):
         self.tempo_tiro_triplo = max(0.0, self.tempo_tiro_triplo - dt)
 
         self.jogador.atualizar(dt, self.solidos, self.largura, self._trepaveis())
+
+        if self.numero == 4 and self.jogador.no_chao and abs(self.jogador.vel.x) > 10:
+            self.timer_passo -= dt
+            if self.timer_passo <= 0:
+                self.timer_passo = 0.34
+                self._som("passo")
+        else:
+            self.timer_passo = 0.0
 
         if self.jogador.no_chao:
             self.combo_dash = 0
@@ -880,7 +951,7 @@ class Fase(Cena):
             self.mensagem = ("Monstro Pálido Derrotado!", "Entre no Portal Dimensional Vermelho para avançar!")
             self.tempo_mensagem = 4.5
 
-        self.camera.seguir(self.jogador.rect, dt)
+        self._atualizar_camera(dt)
 
         if self.jogador.rect.top > self.altura + 200:
             self.jogador.vida -= 1
@@ -1113,10 +1184,7 @@ class Fase(Cena):
         if self._trocando:
             return
         self._trocando = True
-        if self.numero == 3:
-            from cenas.batalha_final import BatalhaFinal
-            self.jogo.trocar_cena(BatalhaFinal(self.jogo))
-        elif existe_fase(self.numero + 1):
+        if existe_fase(self.numero + 1):
             self.jogo.trocar_cena(Fase(self.jogo, self.numero + 1))
         else:
             from cenas.final import Final
@@ -1356,6 +1424,9 @@ class Fase(Cena):
         chefe = self._chefe_ativo()
         if chefe is None:
             return
+        if self.numero == 4:
+            self._desenhar_barra_dragao(tela, chefe)
+            return
         if abs(self.jogador.rect.centerx - chefe.rect.centerx) >= 750:
             return
 
@@ -1379,6 +1450,30 @@ class Fase(Cena):
         pygame.draw.rect(tela, (25, 15, 25), (bx - 2, by - 2, larg_barra + 4, alt_barra), border_radius=4)
         atual = int(larg_barra * max(0, chefe.vida) / chefe.vida_max)
         pygame.draw.rect(tela, (190, 35, 65), (bx, by, atual, alt_barra - 4), border_radius=3)
+
+    def _desenhar_barra_dragao(self, tela, dragao):
+        """5 barras de vida lado a lado; cada tiro certeiro apaga 25% da barra atual."""
+        larg_bar, alt_bar, espaco = 82, 14, 6
+        total = VIDAS_DRAGAO * larg_bar + (VIDAS_DRAGAO - 1) * espaco
+        x0 = config.LARGURA // 2 - total // 2
+        y0 = 50
+
+        titulo_txt = "DRAGÃO VERMELHO - GUARDIÃO DO CASTELO"
+        nome = self.fonte.render(titulo_txt, True, (235, 225, 240))
+        sombra = self.fonte.render(titulo_txt, True, (0, 0, 0))
+        pos_nome = nome.get_rect(center=(config.LARGURA // 2, y0 - 16))
+        tela.blit(sombra, pos_nome.move(2, 2))
+        tela.blit(nome, pos_nome)
+
+        for i in range(VIDAS_DRAGAO):
+            bx = x0 + i * (larg_bar + espaco)
+            restante = max(0, min(TIROS_POR_VIDA, dragao.golpes - i * TIROS_POR_VIDA))
+            pygame.draw.rect(tela, (25, 15, 25), (bx - 2, y0 - 2, larg_bar + 4, alt_bar + 4), border_radius=4)
+            if restante > 0:
+                pygame.draw.rect(tela, (220, 60, 30), (bx, y0, larg_bar * restante // TIROS_POR_VIDA, alt_bar), border_radius=3)
+            for q in range(1, TIROS_POR_VIDA):      # marcas de 25%
+                pygame.draw.line(tela, (25, 15, 25), (bx + larg_bar * q // TIROS_POR_VIDA, y0),
+                                 (bx + larg_bar * q // TIROS_POR_VIDA, y0 + alt_bar), 2)
 
     # ---------- desenho: Fase 2 (cemitério) ----------
     def _desenhar_plataformas_cemiterio(self, tela):
@@ -1562,6 +1657,11 @@ class Fase(Cena):
         else:
             ajuda = f"Fase {self.numero} | A-D: andar | ESPAÇO: pular | K/SHIFT: dash hitkill | J/X: calibre 12"
         self.hud.desenhar_comandos(tela, ajuda)
+
+        if self.contagem_epilogo is not None and self.contagem_epilogo < 1.2:   # escurece para a tela 5
+            veu = pygame.Surface((config.LARGURA, config.ALTURA))
+            veu.set_alpha(int(255 * (1.0 - max(0.0, self.contagem_epilogo) / 1.2)))
+            tela.blit(veu, (0, 0))
 
         if self.mensagem and self.tempo_mensagem > 0:
             titulo, descricao = self.mensagem
