@@ -16,6 +16,7 @@
 
 - Adriel Massagli de Araujo - RA 824212280
 - Fernanda Rodrigues Coelho - RA 82427370
+- Rayssa Viana Fernandes - RA 824222502
 - Lucas Almeida Ferreira dos Santos - RA 82620608
 - Thiago Yuki Saneshima - RA 82425638
 - Wadja Láyza Gabrielle dos Santos Ferreira - RA 825145905
