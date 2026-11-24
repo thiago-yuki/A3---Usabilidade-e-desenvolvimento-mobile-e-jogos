@@ -9,6 +9,7 @@ class Introducao(Cena):
 
     def __init__(self, jogo):
         super().__init__(jogo)
+        self.jogo.iniciar_musica_menu()
 
         self.LARGURA = 960
         self.ALTURA = 540

@@ -395,6 +395,7 @@ class Fase(Cena):
                 "Use sua Besta de 3 Virotes (J/X) e Dash Hitkill! Derrote a Abominação Derretida no final!",
             )
             self.tempo_mensagem = 4.5
+        self.jogo.iniciar_musica_fase(self.numero)
 
     # ---------- utilidades ----------
     def _som(self, nome):

@@ -14,11 +14,11 @@
 
 **Integrantes:**
 
-- Adriel Massagli de Araujo
-- Fernanda Rodrigues Coelho
-- Lucas Almeida Ferreira dos Santos
-- Thiago Yuki Saneshima
-- Wadja Láyza Gabrielle dos Santos Ferreira
+- Adriel Massagli de Araujo - RA 824212280
+- Fernanda Rodrigues Coelho - RA 82427370
+- Lucas Almeida Ferreira dos Santos - RA 82620608
+- Thiago Yuki Saneshima - RA 82425638
+- Wadja Láyza Gabrielle dos Santos Ferreira - RA 825145905
 
 > O nome escolhido faz referência a `falling in love` e ao medo que a personagem principal enfrenta. A guerreira precisa reencontrar a princesa perdida enquanto encara fisicamente seus maiores medos.
 
@@ -137,7 +137,7 @@ O projeto não possui um placar com pontuação numérica. O progresso é repres
 | Desenvolvimento da Fase 3 | Wadja |
 | Desenvolvimento da Fase 4 / fase final | Lucas |
 | Interface visual e identidade artística | Rayssa |
-| Audio, documentação e testes | Fernanda |
+| Documentação e testes | Fernanda |
 
 
 ## Créditos
@@ -189,7 +189,16 @@ Os seguintes elementos foram desenvolvidos pelo próprio grupo durante a impleme
 
 ### Fontes sonoras
 
-Os efeitos sonoros presentes em `A3 - GAME/sistemas/sons.py` são gerados pelo próprio código e sintetizados em tempo de execução, sem arquivos externos de áudio nesta versão.
+As músicas das fases são disponibilizadas sob licença CC0 no [OpenGameArt.org](https://opengameart.org/). Os créditos e avisos informados nas páginas dos recursos são mantidos abaixo:
+
+- [Prologue Theme](https://opengameart.org/content/prologue-theme) — música de Cleyton Kauffman ([SoundCloud](https://soundcloud.com/cleytonkauffman/)).
+- [Mysterious Clock](https://opengameart.org/content/mysterious-clock).
+- [Battle Theme A](https://opengameart.org/content/battle-theme-a) — atribuição: [cynicmusic.com](https://cynicmusic.com/) e [pixelsphere.org](https://pixelsphere.org/).
+- [Medieval: King's Feast](https://opengameart.org/content/medieval-kings-feast).
+- [Game Over](https://opengameart.org/content/game-over-8) — o autor solicita ser creditado como “Umplix”, caso seja dado crédito.
+- [Medieval: Victory Theme](https://opengameart.org/content/medieval-victory-theme).
+
+Os efeitos sonoros sintetizados em tempo de execução estão implementados em `A3 - GAME/sistemas/sons.py`.
 
 ## Uso de IA
 

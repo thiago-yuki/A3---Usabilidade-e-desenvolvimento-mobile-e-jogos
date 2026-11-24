@@ -6,6 +6,14 @@ import pygame
 
 import config
 from nucleo.cena import Cena
+from sistemas.sons import Sons
+
+ATALHOS_FASES = {
+    pygame.K_1: 1,
+    pygame.K_2: 2,
+    pygame.K_3: 3,
+    pygame.K_4: 4,
+}
 
 
 # =========================================================
@@ -32,6 +40,8 @@ class Menu(Cena):
 
     def __init__(self, jogo):
         super().__init__(jogo)
+        self.jogo.iniciar_musica_menu()
+        self.sons = Sons()
 
         self.largura = config.LARGURA
         self.altura = config.ALTURA
@@ -145,6 +155,8 @@ class Menu(Cena):
 
         self.hover = {nome: 0.0 for nome in self.nomes + ["VOLTAR"]}
         self._ultimo_mouse = None
+        self._mouse_hover_indice = None
+        self._hover_voltar_anterior = False
 
         self._acao_pendente = None
         self._fade_saida = 0.0
@@ -728,10 +740,14 @@ class Menu(Cena):
     # =====================================================
 
     def _iniciar(self, numero):
-        from cenas.fase import Fase
-
+        self.jogo.parar_musica()
         self.jogo.habilidades.clear()
-        self.jogo.trocar_cena(Fase(self.jogo, numero))
+        if numero == 4:
+            from cenas.batalha_final import BatalhaFinal
+            self.jogo.trocar_cena(BatalhaFinal(self.jogo))
+        else:
+            from cenas.fase import Fase
+            self.jogo.trocar_cena(Fase(self.jogo, numero))
 
     def _agendar(self, acao):
         self._acao_pendente = acao
@@ -754,6 +770,24 @@ class Menu(Cena):
         elif nome == "SAIR":
             self._agendar(self.jogo.sair)
 
+    def _selecionar(self, indice, emitir_som=True):
+        if indice != self.selecionado:
+            self.selecionado = indice
+            if emitir_som:
+                self.sons.tocar("selecao_menu", 0.65)
+
+    def _selecionar_mouse(self, indice):
+        if indice != self._mouse_hover_indice:
+            self.sons.tocar("selecao_menu", 0.65)
+        self._mouse_hover_indice = indice
+        self._selecionar(indice, emitir_som=False)
+
+    def _atualizar_hover_voltar(self, mouse):
+        hover = self.tela_atual != "menu" and self.botao_voltar.collidepoint(mouse)
+        if hover and not self._hover_voltar_anterior:
+            self.sons.tocar("selecao_menu", 0.65)
+        self._hover_voltar_anterior = hover
+
     # =====================================================
     # EVENTOS
     # =====================================================
@@ -773,18 +807,19 @@ class Menu(Cena):
 
                 else:
                     if e.key in (pygame.K_UP, pygame.K_w):
-                        self.selecionado = (self.selecionado - 1) % len(self.nomes)
+                        self._selecionar((self.selecionado - 1) % len(self.nomes))
 
                     elif e.key in (pygame.K_DOWN, pygame.K_s):
-                        self.selecionado = (self.selecionado + 1) % len(self.nomes)
+                        self._selecionar((self.selecionado + 1) % len(self.nomes))
 
                     elif e.key in (pygame.K_RETURN, pygame.K_KP_ENTER,
                                    pygame.K_SPACE):
                         self._ativar(self.nomes[self.selecionado])
 
-                    elif e.key == pygame.K_2:
-                        # atalho de desenvolvimento (sem texto na tela)
-                        self._agendar(lambda: self._iniciar(2))
+                    elif e.key in ATALHOS_FASES:
+                        numero = ATALHOS_FASES[e.key]
+                        self._agendar(lambda numero=numero: self._iniciar(numero))
+                        return
 
                     elif e.key == pygame.K_ESCAPE:
                         self._agendar(self.jogo.sair)
@@ -794,7 +829,7 @@ class Menu(Cena):
                 if self.tela_atual == "menu":
                     for i, nome in enumerate(self.nomes):
                         if self.botoes[nome].collidepoint(e.pos):
-                            self.selecionado = i
+                            self._selecionar_mouse(i)
                             self._ativar(nome)
                             break
 
@@ -829,14 +864,20 @@ class Menu(Cena):
         # mouse: só muda a seleção se o mouse realmente se moveu,
         # assim o teclado continua funcionando com o mouse parado
         mouse = pygame.mouse.get_pos()
+        self._atualizar_hover_voltar(mouse)
 
         if mouse != self._ultimo_mouse:
             self._ultimo_mouse = mouse
 
             if self.tela_atual == "menu":
+                indice_hover = None
                 for i, nome in enumerate(self.nomes):
                     if self.botoes[nome].collidepoint(mouse):
-                        self.selecionado = i
+                        indice_hover = i
+                        self._selecionar_mouse(i)
+                        break
+                if indice_hover is None:
+                    self._mouse_hover_indice = None
 
         # animação suave dos botões
         suavizar = min(1.0, dt * 12)

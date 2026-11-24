@@ -19,9 +19,9 @@ from entidades.saida import Saida
 from nucleo.cena import Cena
 from nucleo.camera import Camera
 from sistemas import cenario as C
-from sistemas.audio import Audio
 from sistemas.hud_batalha import HudBatalha
 from sistemas.recursos import sprite, texto
+from sistemas.sons import Sons
 from cenas.final import Final
 
 LARG, ALT = C.LARGURA, C.ALTURA
@@ -44,16 +44,29 @@ TECLAS_PAUSA = [                        # lista mostrada no menu de pausa
     ("A / D", "andar"), ("ESPAÇO", "pular (2x no ar)"), ("SHIFT", "espada"),
     ("X / J", "atirar gosma"), ("K", "avançar"), ("ESC", "continuar"),
 ]
+SONS_BATALHA = {
+    "pulo": "pulo",
+    "espada": "dash",
+    "gosma": "plasma",
+    "dano_heroi": "dano",
+    "dano_dragao": "hitkill_fantasma",
+    "fogo": "invocar",
+    "rugido": "invocar",
+    "impacto_fogo": "dano",
+    "asas": "dash",
+    "porta": "powerup",
+    "luz": "powerup",
+    "vitoria": "powerup",
+    "passo": "passo",
+    "galope": "galope",
+    "relincho": "relincho",
+}
 
 
 class BatalhaFinal(Cena):
     def __init__(self, jogo):
         super().__init__(jogo)
-        if not hasattr(jogo, "audio"):
-            jogo.audio = Audio()
-        self.audio = jogo.audio
-        self.audio.pre_carregar(["espada", "gosma", "dano_heroi", "dano_dragao", "fogo", "rugido",
-                                 "impacto_fogo", "pulo", "asas", "derrota"])
+        self.audio = Sons()
         self.canvas = pygame.Surface((LARG, ALT))
         self.mundo = pygame.Surface((LARG, ALT))
         self.camera = Camera(LARG, ALT)
@@ -62,6 +75,7 @@ class BatalhaFinal(Cena):
         self.fade = 1.0                       # 1 = preto total (abre no começo)
         self.pausado = False
         self._iniciar_batalha()
+        self.jogo.iniciar_musica_fase(4)
 
     # ================================================================ preparo
     def _iniciar_batalha(self):
@@ -87,12 +101,11 @@ class BatalhaFinal(Cena):
         self.estado = "intro"
         self.t_estado = 0.0
         self.fade = 1.0
-        self.audio.musica("musica_boss")
 
     def _ir(self, estado):
         self.estado = estado
         self.t_estado = 0.0
-        self.cs_passo_t = 0.0                   # cada cena de cutscene começa com o timer de passos zerado
+        self.cs_passo_t = 0.0
 
     # ================================================================ eventos
     def eventos(self, eventos):
@@ -113,11 +126,11 @@ class BatalhaFinal(Cena):
         h = self.heroi
         if tecla in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
             if h.pulos_restantes > 0:
-                self.audio.tocar("pulo", 0.5)
+                self._tocar_som("pulo", 0.5)
             h.pular()
         elif tecla in (pygame.K_LSHIFT, pygame.K_RSHIFT):
             if h.tempo_recarga <= 0:
-                self.audio.tocar("espada")
+                self._tocar_som("espada")
             h.atacar()
         elif tecla == pygame.K_k:
             h.avancar()
@@ -126,7 +139,10 @@ class BatalhaFinal(Cena):
                 x, y = h.boca_gosma
                 self.gosmas.append(Gosma(x, y, h.direcao))   # sai em linha reta, para onde o herói olha
                 h.atirar()
-                self.audio.tocar("gosma")
+                self._tocar_som("gosma")
+
+    def _tocar_som(self, nome, volume=1.0):
+        self.audio.tocar(SONS_BATALHA[nome], volume)
 
     def _silenciar(self):
         """Corta todos os efeitos que ainda estiverem tocando (evita som 'preso' entre as cenas)."""
@@ -150,11 +166,10 @@ class BatalhaFinal(Cena):
                 pass
 
     def _sair_do_jogo(self):
-        self.audio.parar_musica()
+        self._silenciar()
         self.jogo.sair()
 
     def _mostrar_game_over(self):
-        self.audio.parar_musica()
         from cenas.game_over import GameOver
         self.jogo.trocar_cena(GameOver(self.jogo, 4))
 
@@ -215,7 +230,7 @@ class BatalhaFinal(Cena):
         if area and id(d) not in h.alvos_acertados and (area.colliderect(corpo) or area.colliderect(cabeca)):
             if d.receber_dano(config.BATALHA_DANO_ESPADA):
                 h.alvos_acertados.add(id(d))
-                self.audio.tocar("dano_dragao")
+                self._tocar_som("dano_dragao")
                 self._faiscas(area.centerx + h.direcao * 20, area.centery, (255, 226, 120), 12)
                 self._tremer(3, 0.1)
 
@@ -229,7 +244,7 @@ class BatalhaFinal(Cena):
             if g.vivo and (g.rect.colliderect(corpo) or g.rect.colliderect(cabeca)):
                 g.vivo = False
                 if d.receber_dano(config.BATALHA_DANO_GOSMA):
-                    self.audio.tocar("dano_dragao")
+                    self._tocar_som("dano_dragao")
                 self._faiscas(g.pos.x, g.pos.y, (130, 230, 100), 14, 240)
                 self._tremer(3, 0.1)
             elif not g.vivo:
@@ -245,7 +260,7 @@ class BatalhaFinal(Cena):
                     self._faiscas(b.pos.x, b.pos.y, (255, 170, 60), 12)
             if b.bateu_chao:
                 self._faiscas(b.pos.x, CHAO - 6, (255, 150, 50), 10, 200)
-                self.audio.tocar("impacto_fogo", 0.35)
+                self._tocar_som("impacto_fogo", 0.35)
         self.bolas = [b for b in self.bolas if b.vivo]
         for o in self.ondas:
             o.atualizar(dt)
@@ -257,13 +272,12 @@ class BatalhaFinal(Cena):
         self._processar_eventos_dragao()
 
         if h.vida <= 0 and self.estado == "luta":
-            self.audio.tocar("derrota")
             self._mostrar_game_over()
 
     def _dano_heroi(self, origem_x):
         h = self.heroi
         if h.receber_dano(1, origem_x):
-            self.audio.tocar("dano_heroi")
+            self._tocar_som("dano_heroi")
             self._tremer(7, 0.25)
             self._piscar((255, 40, 40), 0.18)
             self._faiscas(h.rect.centerx, h.rect.centery, (255, 90, 80), 10, 220)
@@ -275,17 +289,17 @@ class BatalhaFinal(Cena):
         for ev in d.eventos:
             tipo = ev[0]
             if tipo == "rugido":
-                self.audio.tocar("rugido")
+                self._tocar_som("rugido")
             elif tipo == "projetil":
                 (self.ondas if isinstance(ev[1], OndaDeFogo) else self.bolas).append(ev[1])
             elif tipo == "tremor":
                 self._tremer(ev[1], ev[2])
             elif tipo == "fogo":
-                self.audio.tocar("fogo", 0.8)
+                self._tocar_som("fogo", 0.8)
             elif tipo == "asas":
-                self.audio.tocar("asas", ev[1] if len(ev) > 1 else 1.0)
+                self._tocar_som("asas", ev[1] if len(ev) > 1 else 1.0)
             elif tipo == "pouso":
-                self.audio.tocar("impacto_fogo")
+                self._tocar_som("impacto_fogo")
             elif tipo == "barra":
                 self._piscar((255, 255, 255), 0.35)
                 cx, cy = d.centro()
@@ -295,8 +309,8 @@ class BatalhaFinal(Cena):
                 self._piscar((255, 255, 255), 0.6)
                 cx, cy = d.centro()
                 self._faiscas(cx, cy, (255, 220, 120), 60, 520, 400, 1.1)
-                self.audio.parar_musica()
-                self.audio.tocar("rugido")
+                self._silenciar()
+                self._tocar_som("rugido")
                 self._tremer(12, 1.2)
                 self._preparar_cutscene()
         d.eventos.clear()
@@ -314,7 +328,6 @@ class BatalhaFinal(Cena):
         self.cs_alfa_heroi = 255
         self.cs_alfa_princesa = 0
         self.cs_ultima_luz = 0
-        self.cs_passo_t = 0.0
         self.cav_x = -240.0
         self.cav_espelhar = False
         self.cav_vel = 0.0
@@ -329,7 +342,7 @@ class BatalhaFinal(Cena):
         d.atualizar(dt, h.rect.center)
         for ev in d.eventos:                           # o dragão ferido bate as asas ao fugir (some com a distância)
             if ev[0] == "asas":
-                self.audio.tocar("asas", ev[1] if len(ev) > 1 else 1.0)
+                self._tocar_som("asas", ev[1] if len(ev) > 1 else 1.0)
         d.eventos.clear()
         if e == "cs_dragao":
             if d.estado == "morrendo" and t >= 1.6:
@@ -338,7 +351,7 @@ class BatalhaFinal(Cena):
             if d.estado == "fugindo" and (d.fora_da_tela or t > 6.0):
                 self.portal.selado = False
                 self._silenciar()                       # o dragão já foi embora: nada de asas
-                self.audio.tocar("porta")
+                self._tocar_som("porta")
                 self._ir("cs_porta")
 
         elif e == "cs_porta":
@@ -347,9 +360,9 @@ class BatalhaFinal(Cena):
                 h.rect.centerx = min(alvo, h.rect.centerx + round(230 * dt))
                 h.vel.x = 230
                 self.cs_passo_t -= dt
-                if self.cs_passo_t <= 0 and t > 0.5:      # passos só enquanto ele anda
-                    self.cs_passo_t = 0.3
-                    self.audio.tocar("passo", 0.4)
+                if self.cs_passo_t <= 0 and t > 0.5:
+                    self.cs_passo_t = 0.32
+                    self._tocar_som("passo", 0.55)
             else:
                 h.vel.x = 0
                 self.cs_alfa_heroi = max(0, self.cs_alfa_heroi - round(255 * dt / 0.7))
@@ -360,11 +373,10 @@ class BatalhaFinal(Cena):
             self.luzes = min(len(C.JANELAS_TORRE), int(t / 0.8) + 1)
             if self.luzes != self.cs_ultima_luz:
                 self.cs_ultima_luz = self.luzes
-                self.audio.tocar("passo")
-                self.audio.tocar("luz", 0.6)
+                self._tocar_som("luz", 0.6)
             if t >= 0.8 * len(C.JANELAS_TORRE) + 0.6:
                 self._piscar((255, 230, 160), 0.4)
-                self.audio.tocar("vitoria")
+                self._tocar_som("vitoria")
                 self._ir("cs_princesa")
 
         elif e == "cs_princesa":
@@ -383,13 +395,13 @@ class BatalhaFinal(Cena):
                 if t > 0.6:
                     self.cs_passo_t -= dt
                     if self.cs_passo_t <= 0:
-                        self.cs_passo_t = 0.19
-                        self.audio.tocar("galope", 0.6)
+                        self.cs_passo_t = 0.24
+                        self._tocar_som("galope", 0.6)
                     self.cav_x += 560 * dt
                     if self.cav_x >= 640:
                         self.cav_x = 640.0
                         self.cav_chegou = True
-                        self.audio.tocar("relincho")
+                        self._tocar_som("relincho")
                         self._ir("cs_cavalo")  # reinicia t_estado para a caminhada
                         self.cs_alfa_heroi = self.cs_alfa_princesa = 255
             else:
@@ -402,12 +414,12 @@ class BatalhaFinal(Cena):
                         self.princesa_x = h.rect.centerx + 52
                         self.cs_passo_t -= dt
                         if self.cs_passo_t <= 0:
-                            self.cs_passo_t = 0.3
-                            self.audio.tocar("passo", 0.4)
+                            self.cs_passo_t = 0.32
+                            self._tocar_som("passo", 0.45)
                     else:
                         h.vel.x = 0
                         self.cav_espelhar = True
-                        self.audio.tocar("relincho")
+                        self._tocar_som("relincho")
                         self._ir("cs_cavalgar")
 
         elif e == "cs_cavalgar":
@@ -415,8 +427,9 @@ class BatalhaFinal(Cena):
             self.cav_x -= self.cav_vel * dt
             self.cs_passo_t -= dt
             if self.cs_passo_t <= 0:
-                self.cs_passo_t = 0.18
-                self.audio.tocar("galope", max(0.1, min(0.7, 0.7 - (640 - self.cav_x) / 1200.0)))
+                self.cs_passo_t = 0.26
+                volume = max(0.1, min(0.7, 0.7 - (640 - self.cav_x) / 1200.0))
+                self._tocar_som("galope", volume)
             if self.cav_x < -300:
                 self._silenciar()
                 self._ir("fim_fade")
@@ -424,7 +437,7 @@ class BatalhaFinal(Cena):
         elif e == "fim_fade":
             self.cs_fade = min(1.0, t / 1.2)
             if t >= 1.4:
-                self.audio.parar_musica()
+                self._silenciar()
                 from cenas.game_over import GameOver
                 self.jogo.trocar_cena(GameOver(self.jogo, 4, vitoria=True))
 

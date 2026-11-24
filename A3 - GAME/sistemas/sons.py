@@ -41,6 +41,10 @@ class Sons:
         self.sons["dano"] = self._gerar_onda(0.22, 190, 65, volume=0.38, ruido=0.30)
         self.sons["powerup"] = self._gerar_arpejo([523, 659, 784, 1046], 0.06, volume=0.26)
         self.sons["invocar"] = self._gerar_onda(0.35, 110, 280, volume=0.30, ruido=0.18)
+        self.sons["passo"] = self._gerar_passo()
+        self.sons["galope"] = self._gerar_galope()
+        self.sons["relincho"] = self._gerar_relincho()
+        self.sons["selecao_menu"] = self._gerar_selecao_menu()
 
     def _gerar_espingarda(self):
         rng = random.Random(12)
@@ -93,6 +97,85 @@ class Sons:
             amostras.append(val * 32767 * 0.32)
         return self._criar_som(amostras)
 
+    def _gerar_passo(self):
+        rng = random.Random(44)
+        duracao = 0.12
+        total = int(self.TAXA * duracao)
+        amostras = []
+        fase = 0.0
+        for i in range(total):
+            t = i / self.TAXA
+            prog = i / total
+            freq = 115 - 48 * prog
+            fase += (2.0 * math.pi * freq) / self.TAXA
+            env = (1.0 - prog) ** 3
+            impacto = math.sin(fase) * 0.75
+            ruido = rng.uniform(-1.0, 1.0) * math.exp(-t * 95.0) * 0.35
+            amostras.append((impacto + ruido) * env * 0.34 * 32767)
+        return self._criar_som(amostras)
+
+    def _gerar_galope(self):
+        rng = random.Random(55)
+        duracao = 0.21
+        total = int(self.TAXA * duracao)
+        batidas = (0.0, 0.09, 0.16)
+        amostras = []
+        for i in range(total):
+            t = i / self.TAXA
+            val = 0.0
+            for indice, inicio in enumerate(batidas):
+                dt = t - inicio
+                if 0 <= dt < 0.065:
+                    prog = dt / 0.065
+                    env = (1.0 - prog) ** 2.5
+                    freq = (125 if indice % 2 == 0 else 175) - 55 * prog
+                    casco = math.sin(2.0 * math.pi * freq * dt) * 0.65
+                    estalo = rng.uniform(-1.0, 1.0) * math.exp(-dt * 100.0) * 0.35
+                    val += (casco + estalo) * env
+            amostras.append(val * 0.32 * 32767)
+        return self._criar_som(amostras)
+
+    def _gerar_relincho(self):
+        rng = random.Random(66)
+        duracao = 0.9
+        total = int(self.TAXA * duracao)
+        amostras = []
+        fase = 0.0
+        for i in range(total):
+            t = i / self.TAXA
+            prog = t / duracao
+            if prog < 0.58:
+                freq = 370 + 790 * (prog / 0.58)
+            else:
+                freq = 1160 - 430 * ((prog - 0.58) / 0.42)
+            freq += 38 * math.sin(2.0 * math.pi * 6.5 * t)
+            fase += (2.0 * math.pi * freq) / self.TAXA
+
+            ataque = min(1.0, t / 0.06)
+            soltura = min(1.0, (duracao - t) / 0.22)
+            pulsacao = 0.68 + 0.32 * math.sin(2.0 * math.pi * 5.2 * t)
+            voz = math.sin(fase) + 0.32 * math.sin(2.03 * fase) + 0.14 * math.sin(3.07 * fase)
+            ruido = rng.uniform(-1.0, 1.0) * 0.08
+            amostras.append((voz * pulsacao + ruido) * ataque * soltura * 0.28 * 32767)
+        return self._criar_som(amostras)
+
+    def _gerar_selecao_menu(self):
+        rng = random.Random(77)
+        duracao = 0.1
+        total = int(self.TAXA * duracao)
+        amostras = []
+        for i in range(total):
+            t = i / self.TAXA
+            prog = t / duracao
+            env = math.exp(-t * 42.0) * (1.0 - prog) ** 1.5
+            corpo = (
+                0.72 * math.sin(2.0 * math.pi * 265 * t)
+                + 0.28 * math.sin(2.0 * math.pi * 510 * t)
+            )
+            ataque = rng.uniform(-1.0, 1.0) * math.exp(-t * 180.0) * 0.38
+            amostras.append((corpo * env + ataque) * 0.28 * 32767)
+        return self._criar_som(amostras)
+
     def _gerar_onda(self, duracao, freq_ini, freq_fim, volume=0.25, ruido=0.0):
         rng = random.Random(42)
         total = int(self.TAXA * duracao)
@@ -120,6 +203,8 @@ class Sons:
                 amostras.append(val * env * volume * 32767)
         return self._criar_som(amostras)
 
-    def tocar(self, nome):
+    def tocar(self, nome, volume=1.0):
         if self.ativo and nome in self.sons:
-            self.sons[nome].play()
+            som = self.sons[nome]
+            som.set_volume(max(0.0, min(1.0, volume)))
+            som.play()

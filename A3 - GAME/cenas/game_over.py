@@ -80,8 +80,10 @@ class GameOver(Cena):
 
     def __init__(self, jogo, numero, vitoria=False):
         super().__init__(jogo)
+        self.jogo.parar_musica()
         self.numero = numero
         self.vitoria = vitoria
+        self.jogo.tocar_efeito("victory.mp3" if vitoria else "game_over.wav", 0.8)
         if self.vitoria:
             self.OPCOES = [("Voltar ao menu", "ENTER")]
 
