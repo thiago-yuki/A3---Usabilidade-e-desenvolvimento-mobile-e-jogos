@@ -53,7 +53,6 @@ class OndaSombria:
         topo_x = r.right if d == 1 else r.left
         base_tras_x = r.left if d == 1 else r.right
 
-        # Massa principal de gordura e lodo podre
         pygame.draw.polygon(tela, (58, 86, 36), [
             (base_tras_x, r.bottom),
             (base_tras_x + d * 8, r.y + 12 - onda_y),
@@ -61,13 +60,11 @@ class OndaSombria:
             (topo_x, r.bottom - 8),
             (topo_x - d * 5, r.bottom),
         ])
-        # Crista oleosa amarelada
         pygame.draw.polygon(tela, (152, 186, 68), [
             (base_tras_x + d * 7, r.bottom - 4),
             (r.centerx + d * 2, r.y + 9 + onda_y),
             (topo_x - d * 4, r.bottom - 6),
         ], 2)
-        # Bolhas tóxicas saltando
         pygame.draw.circle(tela, (176, 208, 82), (r.centerx - d * 4, r.y + 8 + onda_y), 4)
         pygame.draw.circle(tela, (115, 152, 48), (base_tras_x + d * 6, r.bottom - 10), 5)
 
@@ -95,7 +92,6 @@ class _IAZumbiPerseguidor(Inimigo):
         return any(p.rect.collidepoint(pe_x, pe_y) for p in plataformas)
 
     def _tem_chao_abaixo(self, plataformas, direcao, queda_max=420):
-        """Verifica se existe chão seguro abaixo ao descer de uma plataforma elevada."""
         teste_x = self.rect.right + 14 if direcao == 1 else self.rect.left - 14
         for dy in range(12, queda_max, 18):
             if any(p.rect.collidepoint(teste_x, self.rect.bottom + dy) for p in plataformas):
@@ -108,7 +104,6 @@ class _IAZumbiPerseguidor(Inimigo):
         return any(p.rect.collidepoint(destino_x, pe_y) for p in plataformas)
 
     def _encontrar_plataforma_superior(self, plataformas, alvo):
-        """Busca a plataforma alcançável mais útil para subir na direção da guerreira."""
         melhor_x = None
         melhor_topo = None
         melhor_score = 1e9
@@ -120,14 +115,12 @@ class _IAZumbiPerseguidor(Inimigo):
             if subida < 24 or subida > self.altura_salto_max:
                 continue
 
-            # Ponto mais próximo do zumbi no topo dessa plataforma
             margem = min(22, p.rect.width // 3)
             px = max(p.rect.left + margem, min(p.rect.right - margem, cx))
             dist_zumbi = abs(px - cx)
             if dist_zumbi > 420:
                 continue
 
-            # Garante espaço livre acima da plataforma para não bater a cabeça no teto
             espaco_cabeca = pygame.Rect(px - 16, p.rect.top - 56, 32, 48)
             if any(q is not p and q.rect.colliderect(espaco_cabeca) for q in plataformas):
                 continue
@@ -142,14 +135,12 @@ class _IAZumbiPerseguidor(Inimigo):
         return melhor_x, melhor_topo
 
     def _encontrar_cipo_subida(self, cipos, alvo):
-        """Busca um cipó de escalada que leve para cima na direção da guerreira."""
         melhor_cipo = None
         melhor_score = 1e9
         cx = self.rect.centerx
         base_y = self.rect.bottom
 
         for c in cipos:
-            # Cipó precisa chegar mais alto que o zumbi e ter base alcançável
             if c.rect.top >= self.rect.top - 26:
                 continue
             if c.rect.bottom < base_y - self.altura_salto_max:
@@ -189,7 +180,6 @@ class _IAZumbiPerseguidor(Inimigo):
                 self.direcao = 1 if alvo.rect.centerx >= self.rect.centerx else -1
             return
 
-        # 1. Lógica de escalada ativa em cipó
         if self.escalando:
             cipo_tocado = None
             for c in cipos:
@@ -217,7 +207,6 @@ class _IAZumbiPerseguidor(Inimigo):
                 self.rect.y = round(self.pos.y)
                 return
             else:
-                # Chegou no topo do cipó ou na altura da guerreira: salta para a plataforma ao lado
                 self.escalando = False
                 self.cipo_atual = None
                 if alvo is not None:
@@ -226,7 +215,6 @@ class _IAZumbiPerseguidor(Inimigo):
                 self.vel.x = self.direcao * self.vel_perseguicao
                 self.trava_direcao = 0.45
 
-        # 2. Definição de objetivo de perseguição
         self.perseguindo = False
         alvo_acima = False
         alvo_abaixo = False
@@ -246,7 +234,6 @@ class _IAZumbiPerseguidor(Inimigo):
                     cipo_alvo = self._encontrar_cipo_subida(cipos, alvo)
                     plat_x, plat_topo_y = self._encontrar_plataforma_superior(plataformas, alvo)
 
-                    # Escolhe entre o cipó e a plataforma saltável mais próximos
                     dist_cipo = abs(cipo_alvo.rect.centerx - self.rect.centerx) if cipo_alvo else 1e9
                     dist_plat = abs(plat_x - self.rect.centerx) if plat_x is not None else 1e9
 
@@ -255,7 +242,6 @@ class _IAZumbiPerseguidor(Inimigo):
                     elif plat_x is not None:
                         destino_x = plat_x
                     else:
-                        # Plataforma inalcançável diretamente: faz varredura larga sem tremer no lugar
                         if self.trava_direcao <= 0:
                             self.direcao = self.dir_patrulha_alta
                             self.trava_direcao = 0.55
@@ -271,7 +257,6 @@ class _IAZumbiPerseguidor(Inimigo):
                             self.direcao = nova_dir
                             self.trava_direcao = 0.22
 
-                # Agarra no cipó se encostar nele enquanto sobe
                 if alvo_acima:
                     for c in cipos:
                         if self.rect.colliderect(c.rect.inflate(10, 6)) and c.rect.top < self.rect.top - 22:
@@ -281,7 +266,6 @@ class _IAZumbiPerseguidor(Inimigo):
                             self.vel.y = -self.vel_escalada
                             return
 
-                # Salta para a plataforma superior quando estiver na distância ideal de impulso
                 if (
                     alvo_acima
                     and self.no_chao
@@ -295,7 +279,6 @@ class _IAZumbiPerseguidor(Inimigo):
                         sentido_salto = 1 if destino_x >= self.rect.centerx else -1
                         self._saltar_para_altura(altura_subir, sentido_salto)
 
-                # Bote horizontal normal no mesmo nível
                 if (
                     not alvo_acima
                     and not alvo_abaixo
@@ -316,7 +299,6 @@ class _IAZumbiPerseguidor(Inimigo):
         else:
             self.vel.x = self.direcao * vel_atual
 
-        # Controle de bordas: nunca cai em buraco sem fundo, mas desce plataformas se a guerreira estiver abaixo
         if self.no_chao and abs(self.vel.x) > 0:
             sentido_mov = 1 if self.vel.x > 0 else -1
             if not self._tem_chao_frente(plataformas, sentido_mov):
@@ -330,14 +312,12 @@ class _IAZumbiPerseguidor(Inimigo):
 
         self.vel.y = min(self.vel.y + config.GRAVIDADE * dt, config.VELOCIDADE_QUEDA_MAX)
 
-        # Movimento horizontal e colisão com degraus/paredes
         self.pos.x += self.vel.x * dt
         self.rect.x = round(self.pos.x)
         bateu = False
         parede_tocada = None
         for p in plataformas:
             if self.rect.colliderect(p.rect):
-                # Assistência de subida de borda quando o zumbi quase alcança o topo no salto
                 if not self.no_chao and 0 < (self.rect.bottom - p.rect.top) <= 22:
                     self.rect.bottom = p.rect.top
                     self.pos.y = self.rect.y
@@ -354,7 +334,6 @@ class _IAZumbiPerseguidor(Inimigo):
                 parede_tocada = p
 
         if bateu and self.recuo <= 0:
-            # Se houver um cipó encostado na parede, escala imediatamente
             cipo_parede = next(
                 (c for c in cipos if self.rect.colliderect(c.rect.inflate(18, 8)) and c.rect.top < self.rect.top - 20),
                 None,
@@ -366,7 +345,6 @@ class _IAZumbiPerseguidor(Inimigo):
                 self.vel.y = -self.vel_escalada
                 return
 
-            # Se a parede bloqueando for escalável por salto, pula nela!
             if (
                 self.perseguindo
                 and self.no_chao
@@ -389,7 +367,6 @@ class _IAZumbiPerseguidor(Inimigo):
                 self.dir_patrulha_alta = self.direcao
                 self.tempo_contorno = 0.75
 
-        # Movimento vertical
         self.pos.y += self.vel.y * dt
         self.rect.y = round(self.pos.y)
         self.no_chao = False
@@ -468,7 +445,6 @@ class ZumbiTsunami(_IAZumbiPerseguidor):
 
         braco_y = r_desenho.y + 27 + balanco
         if self.escalando:
-            # Braços agarrando e puxando o cipó para cima
             mao1_y = r_desenho.y + 6 - passo * 2
             mao2_y = r_desenho.y + 16 + passo * 2
             pygame.draw.line(tela, cor_podre, (r_desenho.centerx - 4, braco_y), (r_desenho.centerx - 6, mao1_y), 4)
@@ -728,7 +704,6 @@ class GuardiaoFloresta(Inimigo):
         d = self.direcao
         cx = r.centerx + d * 20
         cy = r.y + 24 + agachar
-        # Olhos deformados e assimétricos: um esbugalhado e outro derretendo para baixo
         return (cx - d * 9, cy - 2, 5), (cx + d * 8, cy + 5, 3)
 
     def desenhar_olhos_brilhantes(self, tela, camera):
@@ -740,7 +715,6 @@ class GuardiaoFloresta(Inimigo):
         for ox, oy, raio in self._posicoes_olhos(r, agachar):
             pygame.draw.circle(tela, cor_brilho, (ox, oy), raio)
             pygame.draw.circle(tela, config.BRANCO, (ox, oy), 1)
-        # Núcleo de gordura ácida brilhando na barriga rasgada
         bx = r.centerx + self.direcao * 10
         by = r.y + 68 + agachar // 2
         pygame.draw.circle(tela, (175, 215, 65), (bx, by), 6)
@@ -764,38 +738,29 @@ class GuardiaoFloresta(Inimigo):
         agachar = 8 if self.estado == "preparando" else 0
         onda_derreter = int(math.sin(t * 4.5) * 4)
 
-        # 1. Poças gordurentas e rastro viscoso no chão
         pygame.draw.ellipse(tela, (42, 62, 26), (r.x - 18, r.bottom - 7, r.width + 36, 12))
         pygame.draw.ellipse(tela, (112, 146, 48), (r.x - 6, r.bottom - 5, r.width + 12, 6))
 
-        # 2. Pernas grossas, inchadas e derretendo sobre os pés
         perna_esq = pygame.Rect(r.x + 14 + passo, r.bottom - 30, 26, 30)
         perna_dir = pygame.Rect(r.right - 40 - passo, r.bottom - 30, 26, 30)
         for pr in (perna_esq, perna_dir):
             pygame.draw.rect(tela, cor_pele_escura, pr, border_radius=8)
-            # Dobra de gordura derretida escorrendo pela perna
             pygame.draw.ellipse(tela, cor_pele, (pr.x - 3, pr.y + 4, pr.width + 6, 14))
             pygame.draw.ellipse(tela, cor_gordura, (pr.x - 4, pr.bottom - 8, pr.width + 8, 8))
 
-        # 3. Corpo colossal, obeso, corcunda e derretido
-        # Corcunda inchada nas costas
         corcunda_x = r.x + 6 if d == 1 else r.x + 26
         pygame.draw.ellipse(tela, cor_pele_escura, (corcunda_x, r.y + 8 + agachar, 66, 56))
         pygame.draw.arc(tela, cor_brilho_oleo, (corcunda_x + 8, r.y + 12 + agachar, 48, 34), 0.4, 2.5, 3)
 
-        # Tronco principal flácido
         torso = pygame.Rect(r.x + 8, r.y + 24 + agachar, r.width - 16, 74 - agachar)
         pygame.draw.rect(tela, cor_pele, torso, border_radius=24)
         pygame.draw.rect(tela, (28, 44, 20), torso, 3, border_radius=24)
 
-        # Barriga gigantesca caída por cima da cintura
         barriga = pygame.Rect(r.x + 2 + d * 6, r.y + 54 + agachar, r.width - 10, 48 - agachar // 2)
         pygame.draw.ellipse(tela, cor_pele, barriga)
         pygame.draw.ellipse(tela, cor_pele_escura, barriga, 2)
-        # Brilho gordurento na pança
         pygame.draw.arc(tela, cor_brilho_oleo, (barriga.x + 12, barriga.y + 6, barriga.width - 24, 24), 0.3, 2.7, 3)
 
-        # Rasgo necrótico na barriga mostrando costelas e pus
         rasgo_x = r.centerx + d * 4
         rasgo_y = r.y + 68 + agachar // 2
         pygame.draw.ellipse(tela, (96, 16, 24), (rasgo_x - 16, rasgo_y - 12, 32, 24))
@@ -804,7 +769,6 @@ class GuardiaoFloresta(Inimigo):
             pygame.draw.line(tela, (206, 198, 162), (rasgo_x + 12, cost_y), (rasgo_x + 2, cost_y + 2), 3)
         pygame.draw.circle(tela, cor_gosma, (rasgo_x, rasgo_y + 3), 5)
 
-        # Pústulas e bolhas de gordura pelo corpo
         for px, py, pr in (
             (r.x + 22, r.y + 42 + agachar, 6),
             (r.right - 24, r.y + 46 + agachar, 5),
@@ -813,7 +777,6 @@ class GuardiaoFloresta(Inimigo):
             pygame.draw.circle(tela, cor_gordura, (px, py), pr)
             pygame.draw.circle(tela, cor_brilho_oleo, (px - 1, py - 1), max(2, pr // 2))
 
-        # 4. Fios de carne derretida e gordura pingando do corpo
         fios_derretidos = [
             (barriga.x + 14, barriga.bottom - 4, 16 + onda_derreter),
             (barriga.centerx, barriga.bottom - 2, 22 - onda_derreter),
@@ -831,13 +794,10 @@ class GuardiaoFloresta(Inimigo):
             if gota_y < r.bottom:
                 pygame.draw.circle(tela, cor_brilho_oleo, (fx, gota_y), 3)
 
-        # 5. Cabeça medonha, deformada e derretida fundida ao tronco
         cab_x = r.centerx + d * 14
         cab_y = r.y + 24 + agachar
-        # Crânio assimétrico com lado esquerdo/direito escorrendo
         pygame.draw.ellipse(tela, cor_pele, (cab_x - 24, cab_y - 18, 46, 36))
         pygame.draw.ellipse(tela, cor_pele_escura, (cab_x - 24, cab_y - 18, 46, 36), 2)
-        # Aba de pele derretida pendurada na bochecha
         bochecha_x = cab_x + d * 12
         pygame.draw.polygon(tela, cor_pele, [
             (bochecha_x - 6, cab_y + 4),
@@ -845,16 +805,13 @@ class GuardiaoFloresta(Inimigo):
             (bochecha_x + 4, cab_y + 24 + onda_derreter),
             (bochecha_x - 4, cab_y + 20),
         ])
-        # Brilho oleoso no topo da careca podre
         pygame.draw.arc(tela, cor_brilho_oleo, (cab_x - 16, cab_y - 15, 30, 14), 0.2, 2.8, 3)
 
-        # Olhos grotescos assimétricos
         for ox, oy, raio in self._posicoes_olhos(r, agachar):
             pygame.draw.circle(tela, (28, 12, 16), (ox, oy), raio + 3)
             pygame.draw.circle(tela, (255, 48, 28), (ox, oy), raio)
             pygame.draw.circle(tela, (255, 225, 95), (ox + d, oy), max(1, raio // 2))
 
-        # Bocão rasgado com mandíbula caída, dentes podres e baba gordurenta
         boca_x = cab_x - 14 if d == 1 else cab_x - 20
         boca = pygame.Rect(boca_x, cab_y + 8, 34, 17)
         pygame.draw.rect(tela, (64, 10, 18), boca, border_radius=6)
@@ -870,11 +827,9 @@ class GuardiaoFloresta(Inimigo):
                 (dx_dente + 5, boca.bottom),
                 (dx_dente + 3, boca.bottom - 5),
             ])
-        # Fios de baba viscosa esticados na boca e pingando do queixo
         pygame.draw.line(tela, cor_brilho_oleo, (boca.centerx - 4, boca.y + 2), (boca.centerx - 2, boca.bottom - 2), 2)
         pygame.draw.line(tela, cor_gosma, (boca.centerx + 5, boca.bottom), (boca.centerx + 5, boca.bottom + 14 + onda_derreter), 3)
 
-        # 6. Braço gigantesco gordurento com garras e fio de lodo
         braco_x = r.right - 18 if d == 1 else r.left - 22
         braco_y = r.y + 44 + agachar
         pygame.draw.rect(tela, cor_pele_escura, (braco_x, braco_y, 40, 22), border_radius=10)
@@ -884,8 +839,8 @@ class GuardiaoFloresta(Inimigo):
         ponta_garra = braco_x + 40 if d == 1 else braco_x
         for gy in (braco_y + 3, braco_y + 10, braco_y + 17):
             pygame.draw.line(tela, (205, 194, 156), (ponta_garra, gy), (ponta_garra + d * 11, gy + 4), 3)
-        # Gota de gordura pendurada na garra
         pygame.draw.line(tela, cor_gosma, (ponta_garra + d * 4, braco_y + 18), (ponta_garra + d * 4, braco_y + 32 + onda_derreter), 3)
+
 
 class Fantasma(Inimigo):
     """Espectro sombrio com aura etérea, capuz rasgado e cauda ondulante."""
@@ -1000,14 +955,16 @@ class OrbeSombrio:
 
 
 class MonstroPalido(Inimigo):
-    """Chefe necromante pálido: nunca cai de plataformas, invoca fantasmas e lança orbes."""
+    """Chefe necromante pálido: patrulha sua ilha sem cair em buracos e usa teleporte sombrio para atravessar abismos."""
 
-    def __init__(self, x_centro, y_base):
+    eh_chefe = True
+
+    def __init__(self, x_centro, y_base, limite_esq=None, limite_dir=None):
         super().__init__(x_centro, y_base, largura=64, altura=104,
                          vida=26, dano=1, velocidade=80, cor=(225, 222, 232))
         self.t = 0.0
         self.tempo_invocacao = 1.4
-        self.intervalo_invocacao = 3.75  # 1,2x mais frequente que 4.5s
+        self.intervalo_invocacao = 3.75
         self.tempo_tiro = 1.6
         self.alvo = None
         self.fantasmas_invocados = []
@@ -1015,24 +972,219 @@ class MonstroPalido(Inimigo):
         self.anim_invocar = 0.0
         self.fantasmas_ativos_arena = 0
 
+        # Limites horizontais da ilha atual
+        self.limite_esq = limite_esq
+        self.limite_dir = limite_dir
+        self._limites_calculados = (limite_esq is not None and limite_dir is not None)
+
+        # Mecânica de Teleporte Sombrio quando o jogador está do outro lado do buraco
+        self.tempo_alvo_fora_ilha = 0.0
+        self.cooldown_teleporte = 0.0
+        self.canalizando_teleporte = 0.0
+        self.duracao_canalizacao = 0.48
+        self.efeitos_teleporte = []  # lista de tuplas (x, y) para a Cena emitir partículas/som
+
     def receber_dano(self, dano, origem_x):
         super().receber_dano(dano, origem_x)
         self.vel.x *= 0.12
         self.vel.y = 0
 
+    def _obter_limites_ilha_em(self, cx, base_y, plataformas):
+        """Retorna (borda_esq, borda_dir, topo_y) da plataforma contínua sob (cx, base_y)."""
+        piso_base = None
+        for p in plataformas:
+            if p.rect.left <= cx <= p.rect.right and abs(p.rect.top - base_y) <= 28:
+                piso_base = p
+                break
+
+        if piso_base is None:
+            return None
+
+        borda_esq = piso_base.rect.left
+        borda_dir = piso_base.rect.right
+        topo_ref = piso_base.rect.top
+
+        expandiu = True
+        while expandiu:
+            expandiu = False
+            for p in plataformas:
+                if abs(p.rect.top - topo_ref) <= 4:
+                    if p.rect.right >= borda_esq - 4 and p.rect.left < borda_esq:
+                        borda_esq = p.rect.left
+                        expandiu = True
+                    if p.rect.left <= borda_dir + 4 and p.rect.right > borda_dir:
+                        borda_dir = p.rect.right
+                        expandiu = True
+
+        return borda_esq, borda_dir, topo_ref
+
+    def _calcular_limites_arena(self, plataformas, forcar=False):
+        if self._limites_calculados and not forcar:
+            return
+
+        ilha = self._obter_limites_ilha_em(self.rect.centerx, self.rect.bottom, plataformas)
+        if ilha is None:
+            return
+
+        borda_esq, borda_dir, _ = ilha
+        margem = max(16, config.TAMANHO_TILE // 2)
+        self.limite_esq = borda_esq + margem
+        self.limite_dir = borda_dir - margem
+        self._limites_calculados = True
+
     def _tem_chao_na_direcao(self, direcao, plataformas):
-        sonda_x = self.rect.centerx + direcao * (self.rect.width // 2 + 12)
+        sonda_x = self.rect.right + 14 if direcao == 1 else self.rect.left - 14
         sonda_y = self.rect.bottom + 8
         return any(p.rect.collidepoint((sonda_x, sonda_y)) for p in plataformas)
+
+    def _alvo_na_mesma_ilha(self):
+        if self.alvo is None:
+            return True
+        if self.limite_esq is None or self.limite_dir is None:
+            return True
+        ax = self.alvo.rect.centerx
+        dentro_x = (self.limite_esq - 28) <= ax <= (self.limite_dir + 28)
+        dentro_y = abs(self.alvo.rect.bottom - self.rect.bottom) <= 130
+        return dentro_x and dentro_y
+
+    def _encontrar_destino_teleporte(self, plataformas):
+        """Busca uma posição segura na plataforma próxima ao jogador para surgir."""
+        if self.alvo is None:
+            return None
+
+        ax = self.alvo.rect.centerx
+        ay = self.alvo.rect.bottom
+
+        # Encontra o chão mais próximo abaixo do jogador
+        piso_alvo = None
+        menor_dy = 9999
+        for p in plataformas:
+            if p.rect.left - 32 <= ax <= p.rect.right + 32 and p.rect.top >= ay - 24:
+                dy = p.rect.top - ay
+                if dy < menor_dy:
+                    menor_dy = dy
+                    piso_alvo = p
+
+        if piso_alvo is None:
+            return None
+
+        ilha = self._obter_limites_ilha_em(piso_alvo.rect.centerx, piso_alvo.rect.top, plataformas)
+        if ilha is None:
+            return None
+
+        borda_esq, borda_dir, topo_y = ilha
+        margem = self.rect.width // 2 + 20
+        min_cx = borda_esq + margem
+        max_cx = borda_dir - margem
+        if min_cx > max_cx:
+            return None
+
+        # Tenta surgir a 185 px de distância do jogador (preferindo o lado com mais espaço)
+        candidatos = [ax + 185, ax - 185, ax + 130, ax - 130, (min_cx + max_cx) // 2]
+        for cx in candidatos:
+            cx_clamp = max(min_cx, min(max_cx, cx))
+            if abs(cx_clamp - ax) < 75:
+                continue
+            teste_rect = pygame.Rect(0, 0, self.rect.width, self.rect.height)
+            teste_rect.midbottom = (round(cx_clamp), topo_y)
+            if not any(teste_rect.colliderect(p.rect) for p in plataformas):
+                return teste_rect.midbottom
+
+        return None
+
+    def _executar_teleporte_sombrio(self, plataformas):
+        destino = self._encontrar_destino_teleporte(plataformas)
+        if destino is None:
+            self.tempo_alvo_fora_ilha = 0.0
+            self.cooldown_teleporte = 2.0
+            return
+
+        # Registra efeito na origem
+        self.efeitos_teleporte.append((self.rect.centerx, self.rect.centery))
+
+        self.rect.midbottom = destino
+        self.pos.x = float(self.rect.x)
+        self.pos.y = float(self.rect.y)
+        self.vel.x = 0.0
+        self.vel.y = 0.0
+        self.no_chao = True
+
+        # Atualiza os limites de borda para a nova ilha
+        self._calcular_limites_arena(plataformas, forcar=True)
+
+        if self.alvo is not None:
+            self.direcao = 1 if self.alvo.rect.centerx >= self.rect.centerx else -1
+
+        # Registra efeito no destino
+        self.efeitos_teleporte.append((self.rect.centerx, self.rect.centery))
+        self.anim_invocar = 0.65
+        self.tempo_alvo_fora_ilha = 0.0
+        self.cooldown_teleporte = 4.2
+
+    def _aplicar_limitador_espaco(self, plataformas):
+        """Mantém o chefe estritamente dentro da zona permitida da ilha atual."""
+        if self.limite_esq is not None and self.rect.left < self.limite_esq:
+            self.rect.left = int(self.limite_esq)
+            self.pos.x = float(self.rect.x)
+            self.vel.x = 0
+            if self.direcao < 0:
+                self.direcao = 1
+
+        if self.limite_dir is not None and self.rect.right > self.limite_dir:
+            self.rect.right = int(self.limite_dir)
+            self.pos.x = float(self.rect.x)
+            self.vel.x = 0
+            if self.direcao > 0:
+                self.direcao = -1
+
+        if self.no_chao:
+            if not self._tem_chao_na_direcao(1, plataformas) and self.vel.x > 0:
+                self.vel.x = 0
+                self.direcao = -1
+            elif not self._tem_chao_na_direcao(-1, plataformas) and self.vel.x < 0:
+                self.vel.x = 0
+                self.direcao = 1
 
     def atualizar(self, dt, plataformas):
         self.t += dt
         self.anim_invocar = max(0.0, self.anim_invocar - dt)
+        self.cooldown_teleporte = max(0.0, self.cooldown_teleporte - dt)
+        self._calcular_limites_arena(plataformas)
+
+        # Se estiver canalizando o teleporte sombrio, fica imóvel acumulando energia e teleporta ao final
+        if self.canalizando_teleporte > 0:
+            self.tempo_dano = max(0.0, self.tempo_dano - dt)
+            self.vel.x = 0
+            self.canalizando_teleporte -= dt
+            if self.alvo:
+                self.direcao = 1 if self.alvo.rect.centerx >= self.rect.centerx else -1
+            if self.canalizando_teleporte <= 0:
+                self.canalizando_teleporte = 0.0
+                self._executar_teleporte_sombrio(plataformas)
+            return
+
+        mesma_ilha = self._alvo_na_mesma_ilha()
 
         if self.alvo and self.recuo <= 0:
             dx = self.alvo.rect.centerx - self.rect.centerx
-            if abs(dx) < 750:
-                self.direcao = 1 if dx >= 0 else -1
+            if abs(dx) < 820:
+                if mesma_ilha:
+                    self.tempo_alvo_fora_ilha = 0.0
+                    nova_dir = 1 if dx >= 0 else -1
+                    if nova_dir == -1 and self.limite_esq is not None and self.rect.left <= self.limite_esq + 2:
+                        self.direcao = 1
+                    elif nova_dir == 1 and self.limite_dir is not None and self.rect.right >= self.limite_dir - 2:
+                        self.direcao = -1
+                    else:
+                        self.direcao = nova_dir
+                else:
+                    # Alvo está do outro lado do buraco: patrulha normalmente sem travar na quina e prepara o teleporte
+                    if self.no_chao and self.cooldown_teleporte <= 0:
+                        self.tempo_alvo_fora_ilha += dt
+                        if self.tempo_alvo_fora_ilha >= 1.1:
+                            self.canalizando_teleporte = self.duracao_canalizacao
+                            self.vel.x = 0
+                            return
 
         pos_x_anterior = self.pos.x
         super().atualizar(dt, plataformas)
@@ -1045,19 +1197,22 @@ class MonstroPalido(Inimigo):
                 self.vel.x = 0
                 self.direcao *= -1
 
+        self._aplicar_limitador_espaco(plataformas)
+
         if self.vivo and self.alvo:
             dist = abs(self.alvo.rect.centerx - self.rect.centerx)
-            if dist < 760:
+            if dist < 820:
                 self.tempo_invocacao -= dt
                 if self.tempo_invocacao <= 0:
                     self.tempo_invocacao = self.intervalo_invocacao
                     if self.fantasmas_ativos_arena < 5:
                         self.anim_invocar = 0.85
-                        # Em fúria (<= 50% de vida), invoca 2 fantasmas de uma vez
                         qtd = 2 if self.vida <= self.vida_max // 2 else 1
                         for i in range(qtd):
                             lado = self.direcao if i == 0 else -self.direcao
                             spawn_x = self.rect.centerx + (lado * 46)
+                            if self.limite_esq is not None and self.limite_dir is not None:
+                                spawn_x = max(self.limite_esq + 20, min(self.limite_dir - 20, spawn_x))
                             spawn_y = self.rect.centery - 38 - (i * 18)
                             novo = Fantasma(spawn_x, spawn_y)
                             novo.alvo = self.alvo
@@ -1066,8 +1221,9 @@ class MonstroPalido(Inimigo):
                 self.tempo_tiro -= dt
                 if self.tempo_tiro <= 0:
                     self.tempo_tiro = 2.4
+                    dir_tiro = 1 if self.alvo.rect.centerx >= self.rect.centerx else -1
                     orbe = OrbeSombrio(
-                        self.rect.centerx + self.direcao * 35,
+                        self.rect.centerx + dir_tiro * 35,
                         self.rect.y + 42,
                         self.alvo.rect.centerx,
                         self.alvo.rect.centery
@@ -1084,6 +1240,15 @@ class MonstroPalido(Inimigo):
         respirar = math.sin(self.t * 3.5) * 2
         cor_pele = (255, 190, 190) if self.tempo_dano > 0 else (228, 226, 235)
         cor_sombra_pele = (155, 150, 168)
+
+        # Vórtice de Teleporte Sombrio enquanto canaliza a travessia
+        if self.canalizando_teleporte > 0:
+            prog = 1.0 - (self.canalizando_teleporte / self.duracao_canalizacao)
+            raio_vortice = max(12, int(74 * (1.0 - prog * 0.65)))
+            vortice = pygame.Surface((160, 160), pygame.SRCALPHA)
+            pygame.draw.circle(vortice, (145, 45, 195, 115), (80, 80), raio_vortice)
+            pygame.draw.circle(vortice, (95, 240, 235, 155), (80, 80), max(6, raio_vortice // 2), 3)
+            tela.blit(vortice, (cx - 80, r.centery - 80))
 
         if self.anim_invocar > 0:
             aura = pygame.Surface((160, 160), pygame.SRCALPHA)
@@ -1116,9 +1281,10 @@ class MonstroPalido(Inimigo):
         pygame.draw.ellipse(tela, (25, 20, 30), (olho_x - 2, cranio.y + 10, 12, 8))
         pygame.draw.circle(tela, (235, 35, 65), (olho_x + 4, cranio.y + 14), 3)
 
+        levantar_braco = 24 if (self.anim_invocar > 0 or self.canalizando_teleporte > 0) else 0
         ombro = (cx + d * 14, r.y + 34 + int(respirar))
-        cotovelo = (cx + d * 32, r.y + 52 - (18 if self.anim_invocar > 0 else 0))
-        mao = (cx + d * 46, r.y + 66 - (32 if self.anim_invocar > 0 else 0))
+        cotovelo = (cx + d * 32, r.y + 52 - int(levantar_braco * 0.6))
+        mao = (cx + d * 46, r.y + 66 - levantar_braco)
         pygame.draw.lines(tela, cor_pele, False, [ombro, cotovelo, mao], 6)
         for g in (-4, 0, 4):
             pygame.draw.line(tela, (90, 85, 100), mao, (mao[0] + d * 10, mao[1] + g + 4), 2)
